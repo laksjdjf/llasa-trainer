@@ -5,7 +5,8 @@
 import gradio as gr
 import os
 import time
-from llasa import LLASA
+from modules.llasa import LLASA
+from modules.llasa_utils import normalize_text
 import sys
 
 # CUDA設定
@@ -27,10 +28,6 @@ def generate_speech(text: str, temperature: float = 0.7, top_p: float = 0.9, rep
         status_with_time = f"❌ {status} ⏱️ {elapsed_time:.2f}秒"
     
     return audio_path, status_with_time, tokens
-
-def normalize_text(text: str) -> str:
-    """テキスト正規化"""
-    return llasa.normalize_text(text)
 
 # Gradio UI
 with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
@@ -54,7 +51,7 @@ with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
                 top_p = gr.Slider(0.1, 1.0, 0.9, step=0.01, label="Top-p")
                 repeat_penalty = gr.Slider(0.1, 2.0, 1.1, step=0.01, label="Repeat Penalty")
             
-            max_tokens = gr.Slider(50, 800, 300, step=25, label="最大トークン数")
+            max_tokens = gr.Slider(50, 2000, 500, step=25, label="最大トークン数")
             generate_btn = gr.Button("🎵 音声生成", variant="primary", size="lg")
         
         with gr.Column(scale=1):
@@ -99,4 +96,5 @@ if __name__ == "__main__":
     
     # LLASAモデル初期化
     llasa = LLASA.from_pretrained(llasa_model)
+    llasa.model.merge_and_unload()
     demo.launch()
