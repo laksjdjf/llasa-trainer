@@ -87,7 +87,7 @@ with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
     
     text_input.submit(
         generate_speech,
-        inputs=[text_input, temperature, top_p, max_tokens],
+        inputs=[text_input, temperature, top_p, repeat_penalty, max_tokens],
         outputs=[audio_output, status_output, token_output]
     )
 
