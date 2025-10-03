@@ -36,6 +36,7 @@ def main(config):
         save_steps=config.training.save_steps,
         save_total_limit=config.training.save_total_limit,
         fp16=config.training.fp16,
+        bf16=config.training.bf16,
         gradient_checkpointing=config.training.gradient_checkpointing,
         warmup_ratio=config.training.warmup_ratio,
         lr_scheduler_type=config.training.lr_scheduler_type,

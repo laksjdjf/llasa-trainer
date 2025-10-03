@@ -66,6 +66,7 @@ def normalize_text(text: str) -> str:
     text = text.translate(HALFWIDTH_KATAKANA_TO_FULLWIDTH)
 
     text = re.sub(r"…{3,}", "……", text)
+    text = INVALID_PATTERN.sub("", text)
 
     return text
 

@@ -1,14 +1,13 @@
 import torch
 import tempfile
 import soundfile as sf
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, Xcodec2Model, Xcodec2FeatureExtractor
 from peft import AutoPeftModelForCausalLM
-from xcodec2.modeling_xcodec2 import XCodec2Model
 from modules.llasa_utils import get_prompt, SpeechOnlyProcessor
 
 
 class LLASA:
-    def __init__(self, model=None, tokenizer=None, codec_model=None):
+    def __init__(self, model=None, tokenizer=None, codec_model=None, feature_extractor=None):
         """LLASA-3B TTS モデルを初期化
         
         Args:
@@ -20,6 +19,7 @@ class LLASA:
         self.model = model
         self.tokenizer = tokenizer
         self.codec_model = codec_model
+        self.feature_extractor = feature_extractor
         self.logits_processor = SpeechOnlyProcessor(tokenizer=self.tokenizer, device=model.device, dtype=next(model.parameters()).dtype)
         self.speech_start_id = self.tokenizer.convert_tokens_to_ids('<|s_0|>')
         self.speech_end_id = self.tokenizer.convert_tokens_to_ids('<|SPEECH_GENERATION_END|>')
@@ -35,24 +35,23 @@ class LLASA:
         try:
             model = AutoPeftModelForCausalLM.from_pretrained(
                 lora_path,
-                torch_dtype=torch.float16,
+                dtype=torch.float16,
             ).eval().to('cuda:0')
         except:
             print("⚠️ 通常モデルとして再試行中...")
             model = AutoModelForCausalLM.from_pretrained(
                 lora_path,
-                torch_dtype=torch.float16,
+                dtype=torch.float16,
             ).eval().to('cuda:0')
         
         print("📝 トークナイザー読み込み中...")
         tokenizer = AutoTokenizer.from_pretrained(lora_path)
         
         print("🎵 XCodec2モデル読み込み中...")
-        codec_model = XCodec2Model.from_pretrained(
-            "NandemoGHS/Anime-XCodec2",
-        ).eval().to('cuda:0')
+        codec_model = Xcodec2Model.from_pretrained("Anime-XCodec2-hf").eval().to('cuda:0')
+        feature_extractor = Xcodec2FeatureExtractor.from_pretrained("Anime-XCodec2-hf")
         
-        return cls(model=model, tokenizer=tokenizer, codec_model=codec_model)
+        return cls(model=model, tokenizer=tokenizer, codec_model=codec_model, feature_extractor=feature_extractor)
     
     @torch.no_grad()
     def generate(
@@ -110,7 +109,7 @@ class LLASA:
         
         # 音声波形生成
         speech_codes = torch.tensor(speech_ids, dtype=torch.long).to('cuda:0').unsqueeze(0).unsqueeze(0)
-        gen_wav = self.codec_model.decode_code(speech_codes)
+        gen_wav = self.codec_model.decode(speech_codes).audio_values
         
         # ファイル保存
         with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
@@ -118,6 +117,6 @@ class LLASA:
             audio_path = tmp_file.name
         
         status_msg = f"✅ 生成完了 ({len(generated_ids)} tokens)"
-        token_info = str(generated_ids)
+        token_info = str(generated_ids.cpu().numpy().tolist())
         
         return audio_path, status_msg, token_info

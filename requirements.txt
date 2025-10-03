@@ -1,0 +1,10 @@
+omegaconf
+transformers @ git+https://github.com/Deep-unlearning/transformers.git@e10b04a2fc57455a649d08448172bc248a85c97d
+trl==0.8.0
+accelerate
+peft
+torch
+torchaudio
+datasets
+gradio
+sounfile

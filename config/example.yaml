@@ -38,7 +38,8 @@ training:
   weight_decay: 0.01                    # 重み減衰
   save_steps: 100                       # 保存間隔（ステップ）
   save_total_limit: 3                   # 保存する最大チェックポイント数
-  fp16: true                           # 16bit精度使用（メモリ節約）
+  fp16: false                           # 16bit精度使用（メモリ節約）
+  bf16: true                          # bfloat16精度使用（A100等で有効）
   gradient_checkpointing: false         # 勾配チェックポイント（メモリ vs 速度）
   warmup_ratio: 0.03                   # ウォームアップ比率
   lr_scheduler_type: cosine            # 学習率スケジューラ

@@ -38,7 +38,7 @@ class TTSTestCallback(TrainerCallback):
     def on_step_end(self, args, state, control, **kwargs):
         """ステップ終了時に呼ばれる"""
         
-        if (state.global_step % self.test_interval == 0) or (state.global_step == 1) or (state.global_step == args.max_steps):
+        if (state.global_step % self.test_interval == 0) or (state.global_step == 1) or (state.global_step == args.max_steps - 1):
             print(f"\n--- Step {state.global_step}: テスト実行中 ---")
             self.test_generation(step=state.global_step)
             print("--- テスト完了 ---\n")
