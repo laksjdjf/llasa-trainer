@@ -33,6 +33,13 @@ JSONL形式でデータを準備：
 {"text": "ありがとうございます！"}
 ```
 
+データセットを学習用とバリデーション用に分割（推奨）：
+
+```bash
+python scripts/split_dataset.py dataset/all_data.jsonl
+# → dataset/train.jsonl と dataset/val.jsonl が生成されます
+```
+
 ### 2. 設定ファイルの作成
 
 `config/example.yaml`を参考に設定ファイルを作成：
