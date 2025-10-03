@@ -196,6 +196,80 @@ print(f"音声ファイル: {audio_path}")
 - データセットのサイズを確認
 - エポック数を増やす
 
+## 🔄 Transformers対応XCodec2モデルの作成
+
+このプロジェクトはHugging Face Transformers対応のXCodec2モデルを使用します。オリジナルのAnime-XCodec2チェックポイントをTransformers形式に変換する場合は、以下の手順に従ってください。
+
+### 前提条件
+
+- `safetensors`ライブラリがインストールされていること
+- Hugging Face Transformersライブラリがインストールされていること
+
+### 変換手順
+
+#### 1. オリジナルチェックポイントのダウンロード
+
+```bash
+# Hugging Faceから元のモデルをダウンロード
+git lfs install
+git clone https://huggingface.co/NandemoGHS/Anime-XCodec2 origin_ckpt
+```
+
+#### 2. 重みキーの変換
+
+オリジナルのチェックポイントはHugging Faceの変換スクリプトと互換性のないキー名を使用しています。`script/convert_weight_norm_key.py`を使用してキーを変換します：
+
+```bash
+python script/convert_weight_norm_key.py
+```
+
+このスクリプトは以下の変換を実行します：
+- `parametrizations.weight.original0` → `weight_g`
+- `parametrizations.weight.original1` → `weight_v`
+- `act.bias` → `act.beta`
+
+変換後のモデルは`origin_ckpt/model_c.safetensors`として保存されます。
+
+#### 3. Transformers形式への変換
+
+Hugging Faceの公式変換スクリプトを使用して、PyTorch形式に変換します：
+
+```bash
+python venv/lib/python3.12/site-packages/transformers/models/xcodec2/convert_xcodec2_checkpoint_to_pytorch.py \
+  --checkpoint_path origin_ckpt/model_c.safetensors \
+  --config_path origin_ckpt/config.json \
+  --pytorch_dump_folder_path Anime-XCodec2-hf
+```
+
+**注意**: 
+- パスは環境に応じて調整してください（`venv/lib/python3.12/`の部分など）
+- 変換には数分かかる場合があります
+- 変換後のモデルは`Anime-XCodec2-hf`ディレクトリに保存されます
+
+#### 4. 変換モデルの使用
+
+変換が完了したら、ローカルパスを指定してモデルを使用できます：
+
+```python
+from transformers import Xcodec2Model, Xcodec2FeatureExtractor
+
+# ローカルの変換済みモデルを使用
+codec_model = Xcodec2Model.from_pretrained("./Anime-XCodec2-hf")
+feature_extractor = Xcodec2FeatureExtractor.from_pretrained("./Anime-XCodec2-hf")
+```
+
+または、データセット作成時にローカルモデルを使用するように`create_dataset.py`を修正することもできます。
+
+### トラブルシューティング
+
+**ImportError: cannot import name 'Xcodec2Model'**
+- Transformersライブラリのバージョンを確認してください
+- このプロジェクトは特定のTransformersフォークを使用しています（`requirements.txt`参照）
+
+**KeyError during conversion**
+- ステップ2の重みキー変換が正しく実行されたか確認してください
+- `origin_ckpt/model_c.safetensors`が存在するか確認してください
+
 ## 📁 プロジェクト構造
 
 ```
