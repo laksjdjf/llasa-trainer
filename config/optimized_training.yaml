@@ -1,0 +1,86 @@
+# LLASA TTS trainer 最適化設定ファイル
+# 学習精度・効率を最大化するための推奨設定
+
+# =============================================================================
+# 基本設定
+# =============================================================================
+
+# データとモデルパス
+data_dir: dataset/train.jsonl          # 学習データのパス
+eval_data_dir: dataset/val.jsonl       # バリデーションデータのパス（過学習防止に必須）
+output_dir: ./trained/OptimizedModel    # 学習結果の保存先
+model_name: NandemoGHS/Anime-Llasa-3B   # ベースモデル名
+
+# CUDA設定
+cuda_visible_devices: "0"               # 使用するGPU
+
+# =============================================================================
+# LoRA設定 - より高い表現力を持つ設定
+# =============================================================================
+lora:
+  r: 32                    # ランクを増やして表現力UP（メモリに余裕があれば64も試す）
+  lora_alpha: 64          # rの2倍
+  lora_dropout: 0.05      # 過学習防止
+  bias: none              # バイアス学習（none推奨）
+  target_modules:         # より多くのレイヤーに適用
+    - q_proj
+    - k_proj  
+    - v_proj
+    - o_proj
+    - gate_proj           # FFN層も追加
+    - up_proj
+    - down_proj
+
+# =============================================================================
+# 学習設定 - 精度と効率の最適化
+# =============================================================================
+training:
+  num_train_epochs: 15                  # エポック数（Early Stopping使用なら多めに設定）
+  per_device_train_batch_size: 2        # バッチサイズ（メモリに応じて調整）
+  gradient_accumulation_steps: 4        # 実効バッチサイズ = 2 * 4 = 8
+  learning_rate: 5e-5                   # やや低めの学習率（安定性重視）
+  weight_decay: 0.01                    # 正則化
+  save_steps: 50                        # 保存間隔（短めで細かく保存）
+  save_total_limit: 5                   # より多くのチェックポイントを保持
+  
+  # 精度設定（Ampere以降のGPU推奨）
+  fp16: false                          # FP16は使用しない
+  bf16: true                           # BFloat16で精度と速度の両立
+  
+  gradient_checkpointing: true          # メモリ節約（必須）
+  warmup_ratio: 0.05                   # ウォームアップをやや長めに
+  lr_scheduler_type: cosine_with_restarts  # 学習率スケジューラ（periodic restart）
+  
+  # 最適化設定
+  optim: adamw_torch_fused             # 最速オプティマイザ（Ampere以降）
+  max_grad_norm: 1.0                   # 勾配クリッピング
+  group_by_length: true                # 長さでグループ化（効率UP）
+  
+  # ロギング設定
+  logging_steps: 5                     # 細かくログ出力
+  logging_dir: null
+  report_to: tensorboard               # TensorBoard使用（視覚化推奨）
+  
+  # バリデーション設定
+  evaluation_strategy: steps           # ステップごとに評価
+  eval_steps: 50                       # 評価間隔
+  save_strategy: steps
+  load_best_model_at_end: true         # 最良モデルを自動ロード
+  metric_for_best_model: eval_loss     # バリデーションロスで判定
+  greater_is_better: false
+  
+  # Early Stopping（過学習を自動で防止）
+  use_early_stopping: true
+  early_stopping_patience: 5           # 5回改善なしで停止
+  early_stopping_threshold: 0.001      # 改善の閾値
+  
+  # データローダー最適化
+  dataloader_num_workers: 4            # 並列データ読み込み（CPU負荷に応じて調整）
+  dataloader_pin_memory: true          # GPU転送高速化
+
+# =============================================================================
+# テスト設定
+# =============================================================================
+test:
+  text: 今日もいい天気だね。      # テスト用テキスト
+  interval: 50                       # テスト実行間隔（短めで頻繁にチェック）

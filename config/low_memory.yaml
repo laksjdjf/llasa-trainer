@@ -1,0 +1,79 @@
+# LLASA TTS trainer 省メモリ設定ファイル
+# GPU VRAMが少ない環境での学習設定（8GB〜12GB VRAM向け）
+
+# =============================================================================
+# 基本設定
+# =============================================================================
+
+data_dir: dataset/train.jsonl
+eval_data_dir: dataset/val.jsonl
+output_dir: ./trained/LowMemoryModel
+model_name: NandemoGHS/Anime-Llasa-3B
+
+cuda_visible_devices: "0"
+
+# =============================================================================
+# LoRA設定 - メモリ節約重視
+# =============================================================================
+lora:
+  r: 8                     # ランクを小さく（メモリ節約）
+  lora_alpha: 16          # rの2倍
+  lora_dropout: 0.05
+  bias: none
+  target_modules:         # 最小限のレイヤーのみ
+    - q_proj
+    - v_proj
+
+# =============================================================================
+# 学習設定 - メモリ最適化
+# =============================================================================
+training:
+  num_train_epochs: 20
+  per_device_train_batch_size: 1        # 最小バッチサイズ
+  gradient_accumulation_steps: 16       # 勾配蓄積で補完（実効バッチサイズ=16）
+  learning_rate: 1e-4
+  weight_decay: 0.01
+  save_steps: 100
+  save_total_limit: 2                   # 保存数を最小限に
+  
+  # 精度設定
+  fp16: true                           # FP16でメモリ節約
+  bf16: false
+  
+  gradient_checkpointing: true          # 必須（メモリを大幅削減）
+  warmup_ratio: 0.03
+  lr_scheduler_type: cosine
+  
+  # 最適化設定
+  optim: adamw_8bit                    # 8bitオプティマイザでメモリ節約
+  max_grad_norm: 1.0
+  group_by_length: false               # メモリ優先でオフ
+  
+  # ロギング設定
+  logging_steps: 20
+  logging_dir: null
+  report_to: null                      # ロギングなし（メモリ節約）
+  
+  # バリデーション設定
+  evaluation_strategy: steps
+  eval_steps: 200                      # 評価頻度を下げる
+  save_strategy: steps
+  load_best_model_at_end: false        # メモリ節約のためオフ
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  
+  # Early Stopping
+  use_early_stopping: true
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.0
+  
+  # データローダー設定
+  dataloader_num_workers: 0            # メインスレッドのみ（メモリ節約）
+  dataloader_pin_memory: false         # メモリ節約
+
+# =============================================================================
+# テスト設定
+# =============================================================================
+test:
+  text: こんにちは。
+  interval: 200                        # テスト頻度を下げる（メモリ節約）
