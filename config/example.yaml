@@ -7,6 +7,7 @@
 
 # データとモデルパス
 data_dir: dataset/data.jsonl          # 学習データのパス
+eval_data_dir: null                    # バリデーションデータのパス（オプション、過学習防止に推奨）
 output_dir: ./trained/MyModel           # 学習結果の保存先
 model_name: NandemoGHS/Anime-Llasa-3B   # ベースモデル名
 
@@ -38,11 +39,41 @@ training:
   weight_decay: 0.01                    # 重み減衰
   save_steps: 100                       # 保存間隔（ステップ）
   save_total_limit: 3                   # 保存する最大チェックポイント数
-  fp16: true                           # 16bit精度使用（メモリ節約）
-  gradient_checkpointing: false         # 勾配チェックポイント（メモリ vs 速度）
+  
+  # 精度設定（A100/H100ではbf16推奨、それ以外はfp16）
+  fp16: false                          # 16bit精度使用（メモリ節約、古いGPU向け）
+  bf16: true                           # BFloat16精度（Ampere以降のGPU推奨、精度◎）
+  
+  gradient_checkpointing: true          # 勾配チェックポイント（メモリ節約、やや速度低下）
   warmup_ratio: 0.03                   # ウォームアップ比率
-  lr_scheduler_type: cosine            # 学習率スケジューラ
+  lr_scheduler_type: cosine            # 学習率スケジューラ（cosine/linear/constant_with_warmup）
+  
+  # 最適化設定
+  optim: adamw_torch_fused             # オプティマイザ（adamw_torch_fused/adamw_8bit/adamw_torch）
+  max_grad_norm: 1.0                   # 勾配クリッピング（安定性向上）
+  group_by_length: false               # 長さでグループ化（効率化、データ依存）
+  
+  # ロギング設定
+  logging_steps: 10                    # ログ出力間隔
+  logging_dir: null                    # ログ保存先（nullの場合はoutput_dir/logs）
   report_to: null                      # ログ出力先（wandb/tensorboard/null）
+  
+  # バリデーション設定（eval_data_dir設定時に有効）
+  evaluation_strategy: steps           # 評価戦略（steps/epoch/no）
+  eval_steps: 100                      # 評価間隔（ステップ）
+  save_strategy: steps                 # 保存戦略（steps/epoch）
+  load_best_model_at_end: true         # 最良モデルをロード（メモリ注意）
+  metric_for_best_model: loss          # 最良モデル判定指標
+  greater_is_better: false             # 指標が大きいほど良いか
+  
+  # Early Stopping設定（過学習防止）
+  use_early_stopping: false            # Early Stoppingを使用（eval_data_dir必須）
+  early_stopping_patience: 3           # 改善しないエポック数
+  early_stopping_threshold: 0.0        # 改善と判定する閾値
+  
+  # データローダー設定
+  dataloader_num_workers: 2            # データローダーのワーカー数（0=メインスレッド、2-4推奨）
+  dataloader_pin_memory: true          # メモリピン留め（GPU転送高速化）
 
 # =============================================================================
 # テスト設定 - 学習中の音声生成テスト
