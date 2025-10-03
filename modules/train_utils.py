@@ -51,7 +51,7 @@ def load_dataset(file_path: str):
     with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
             obj = json.loads(line)
-            samples.append(get_prompt(text=obj["text"], code=obj.get("codes")))
+            samples.append(get_prompt(text=obj["text"], code=obj.get("code")))
 
     # 2) HF Datasets へ
     train_ds = Dataset.from_dict({"text": samples})

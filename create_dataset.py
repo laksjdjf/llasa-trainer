@@ -85,7 +85,7 @@ def create_dataset(audio_dir: Path, text_file: Path, output_file: Path, max_samp
             if codes is None:
                 continue
                 
-            entry = {"text": text, "codes": codes}
+            entry = {"text": text, "code": codes}
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
             created += 1
             
