@@ -188,6 +188,18 @@ lora:
 4. `lora_dropout`を増やす（0.05-0.1）
 5. エポック数を減らす
 
+## 詳細ガイド
+
+より詳しい最適化ガイドは以下を参照してください：
+
+- [学習最適化ガイド](docs/OPTIMIZATION_GUIDE.md) - GPU別の推奨設定、精度向上、速度向上のテクニック
+
+## 設定ファイル例
+
+- `config/example.yaml` - 基本的な設定例
+- `config/optimized_training.yaml` - 精度と効率を最適化した設定
+- `config/low_memory.yaml` - 省メモリ設定（8-12GB VRAM向け）
+
 ## ライセンス
 
 このプロジェクトのライセンスについては、LICENSEファイルを参照してください。
