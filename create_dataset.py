@@ -48,6 +48,16 @@ def extract_codes(audio_path: Path, codec_model, feature_extractor) -> Optional[
         print(f"エラー: {audio_path}: {e}")
         return None
 
+def load_codec_model():
+    """XCodec2モデルと特徴抽出器を読み込み"""
+    print("XCodec2モデルロード中...")
+    codec_model = Xcodec2Model.from_pretrained("Anime-XCodec2-hf")
+    feature_extractor = AutoFeatureExtractor.from_pretrained("Anime-XCodec2-hf")
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    codec_model = codec_model.eval().to(device)
+    print(f"モデルロード完了 ({device})")
+    return codec_model, feature_extractor
+
 def create_dataset(audio_dir: Path, text_file: Path, output_file: Path, max_samples: Optional[int] = None):
     # テキスト読み込み
     print("テキスト読み込み中...")
@@ -55,12 +65,7 @@ def create_dataset(audio_dir: Path, text_file: Path, output_file: Path, max_samp
     print(f"{len(texts)}個のテキストを取得")
     
     # モデル読み込み
-    print("XCodec2モデルロード中...")
-    codec_model = Xcodec2Model.from_pretrained("Anime-XCodec2-hf")
-    feature_extractor = AutoFeatureExtractor.from_pretrained("Anime-XCodec2-hf")
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    codec_model = codec_model.eval().to(device)
-    print(f"モデルロード完了 ({device})")
+    codec_model, feature_extractor = load_codec_model()
     
     # データセット作成
     print("データセット作成中...")

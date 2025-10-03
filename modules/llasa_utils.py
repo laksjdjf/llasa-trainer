@@ -71,19 +71,13 @@ def normalize_text(text: str) -> str:
     return text
 
 def ids_to_speech_tokens(speech_ids):
- 
-    speech_tokens_str = []
-    for speech_id in speech_ids:
-        speech_tokens_str.append(f"<|s_{speech_id}|>")
-    return speech_tokens_str
+    return [f"<|s_{speech_id}|>" for speech_id in speech_ids]
 
 def extract_speech_ids(speech_tokens_str):
- 
     speech_ids = []
     for token_str in speech_tokens_str:
         if token_str.startswith('<|s_') and token_str.endswith('|>'):
             num_str = token_str[4:-2]
-
             num = int(num_str)
             speech_ids.append(num)
         else:
