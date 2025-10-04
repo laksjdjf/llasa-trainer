@@ -25,28 +25,24 @@ def preprocess_audio(audio_path: Path):
         waveform = waveform.mean(dim=0, keepdim=True)
     return waveform.squeeze(0)
 
-def extract_codes(audio_path: Path, codec_model, feature_extractor) -> Optional[List[int]]:
-    try:
-        waveform = preprocess_audio(audio_path)
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        inputs = feature_extractor(
-            audio=waveform,
-            sampling_rate=feature_extractor.sampling_rate,
-            return_tensors="pt",
-            use_torch=True,
-        ).to(device)
+def extract_codes(audio_path: Path, codec_model, feature_extractor) -> List[int]:
+    waveform = preprocess_audio(audio_path)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    inputs = feature_extractor(
+        audio=waveform,
+        sampling_rate=feature_extractor.sampling_rate,
+        return_tensors="pt",
+        use_torch=True,
+    ).to(device)
+
+    with torch.no_grad():
+        vq_code = codec_model.encode(**inputs).audio_codes
+        codes = vq_code[0, 0, :].cpu().numpy().tolist()
     
-        with torch.no_grad():
-            vq_code = codec_model.encode(**inputs).audio_codes
-            codes = vq_code[0, 0, :].cpu().numpy().tolist()
-        
-        del waveform, vq_code
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        return codes
-    except Exception as e:
-        print(f"エラー: {audio_path}: {e}")
-        return None
+    del waveform, vq_code
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return codes
 
 def load_codec_model():
     """XCodec2モデルと特徴抽出器を読み込み"""
@@ -82,8 +78,6 @@ def create_dataset(audio_dir: Path, text_file: Path, output_file: Path, max_samp
                 continue
                 
             codes = extract_codes(audio_path, codec_model, feature_extractor)
-            if codes is None:
-                continue
                 
             entry = {"text": text, "code": codes}
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
