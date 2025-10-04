@@ -116,7 +116,7 @@ class LLASA:
             sf.write(tmp_file.name, gen_wav[0, 0, :].cpu().numpy(), 16000)
             audio_path = tmp_file.name
         
-        status_msg = f"✅ 生成完了 ({len(generated_ids)} tokens)"
-        token_info = str(generated_ids.cpu().numpy().tolist())
+        status_msg = f"✅ 生成完了 ({len(speech_ids)} tokens)"
+        token_info = str(speech_ids)
         
         return audio_path, status_msg, token_info

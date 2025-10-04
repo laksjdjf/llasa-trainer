@@ -5,9 +5,9 @@
 import gradio as gr
 import os
 import time
-from modules.llasa import LLASA
 from modules.llasa_utils import normalize_text
 import sys
+import torch
 
 # CUDA設定
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -23,7 +23,7 @@ def generate_speech(text: str, temperature: float = 0.7, top_p: float = 0.9, rep
     
     # ステータスに時間情報を追加
     if audio_path:
-        status_with_time = f"✅ 生成完了！ ⏱️ {elapsed_time:.2f}秒"
+        status_with_time = f"✅ 生成完了！ ⏱️ {elapsed_time:.2f}秒 {len(tokens.split())} tokens {len(tokens.split())/elapsed_time:.1f}t/s"
     else:
         status_with_time = f"❌ {status} ⏱️ {elapsed_time:.2f}秒"
     
@@ -57,7 +57,7 @@ with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
         with gr.Column(scale=1):
             audio_output = gr.Audio(label="生成音声", type="filepath")
             status_output = gr.Textbox(label="状態", interactive=False)
-            token_output = gr.Textbox(label="トークン情報", interactive=False)
+            token_output = gr.Textbox(label="トークン情報", interactive=False, lines=10)
     
     # サンプルテキスト
     samples = [
@@ -93,8 +93,17 @@ with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
 
 if __name__ == "__main__":
     llasa_model = sys.argv[1] if len(sys.argv) > 1 else "./lora_checkpoints"
+    vllm_mode = llasa_model == "vllm"
     
     # LLASAモデル初期化
+    if vllm_mode:
+        from modules.llasa_server import LLASA
+    else:
+        from modules.llasa import LLASA
+    
     llasa = LLASA.from_pretrained(llasa_model)
-    llasa.model.merge_and_unload()
+    if not vllm_mode:
+        if hasattr(llasa.model, 'merge_and_unload'):
+            llasa.model.merge_and_unload()
+        llasa.model = torch.compile(llasa.model)
     demo.launch()
