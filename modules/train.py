@@ -1,59 +1,76 @@
 import os
+from typing import Optional, List
 
 from transformers import TrainingArguments
 from peft import LoraConfig
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 
-# LLASAクラスをインポート
 from modules.llasa import LLASA
 from modules.train_utils import TTSTestCallback, load_dataset
+from modules.llasa_utils import SPEECH_GENERATION_START
 
-def main(config):
-    """メイン関数"""
-    
-    # CUDA設定
-    os.environ["CUDA_VISIBLE_DEVICES"] = config.cuda_visible_devices
 
-    # LoRA設定（nullの場合はFFTを使用）
-    lora_config = None
-    if config.lora is not None:
-        lora_config = LoraConfig(
-            r=config.lora.r,
-            lora_alpha=config.lora.lora_alpha,
-            lora_dropout=config.lora.lora_dropout,
-            bias=config.lora.bias,
-            target_modules=list(config.lora.target_modules),
-            task_type="CAUSAL_LM"
-        )
-        print(f"🔧 LoRA設定: r={config.lora.r}, alpha={config.lora.lora_alpha}")
-    else:
-        print("🔧 FFT (Full Fine-tuning) モードを使用")
+def create_lora_config(lora_config) -> Optional[LoraConfig]:
+    """Create LoRA configuration from config object.
     
-    # 学習設定（動的に引数を取得）
+    Args:
+        lora_config: Configuration object with LoRA parameters
+        
+    Returns:
+        LoraConfig instance or None if not using LoRA
+    """
+    if lora_config is None:
+        print("🔧 Using FFT (Full Fine-tuning) mode")
+        return None
+    
+    config = LoraConfig(
+        r=lora_config.r,
+        lora_alpha=lora_config.lora_alpha,
+        lora_dropout=lora_config.lora_dropout,
+        bias=lora_config.bias,
+        target_modules=list(lora_config.target_modules),
+        task_type="CAUSAL_LM"
+    )
+    print(f"🔧 LoRA configuration: r={lora_config.r}, alpha={lora_config.lora_alpha}")
+    
+    return config
+
+
+def create_training_arguments(config) -> TrainingArguments:
+    """Create training arguments from config object.
+    
+    Args:
+        config: Configuration object with training parameters
+        
+    Returns:
+        TrainingArguments instance
+    """
     training_kwargs = {
         "output_dir": config.output_dir,
         "overwrite_output_dir": True,
     }
     
-    # config.trainingの全ての設定を動的に追加
+    # Add all training settings dynamically
     if hasattr(config, 'training') and config.training is not None:
         for key, value in config.training.items():
             training_kwargs[key] = value
-            print(f"🔧 学習設定: {key} = {value}")
+            print(f"🔧 Training setting: {key} = {value}")
     
-    training_args = TrainingArguments(**training_kwargs)
-    
-    # LLASAインスタンスを最初に作成（XCodec2も含む）
-    print("🎯 LLASAインスタンスを作成中...")
-    llasa = LLASA.from_pretrained(lora_path=config.model_name)
+    return TrainingArguments(**training_kwargs)
 
-    collator = DataCollatorForCompletionOnlyLM(
-        "<|SPEECH_GENERATION_START|>",
-        tokenizer=llasa.tokenizer,
-    )
+
+def create_callbacks(config, llasa) -> List[TTSTestCallback]:
+    """Create training callbacks from config.
     
-    # テスト用コールバック（設定があれば）
+    Args:
+        config: Configuration object with callback parameters
+        llasa: LLASA model instance
+        
+    Returns:
+        List of callback instances
+    """
     callbacks = []
+    
     if hasattr(config, 'test') and config.test is not None:
         test_callback = TTSTestCallback(
             llasa=llasa,
@@ -62,15 +79,47 @@ def main(config):
             save_path=config.output_dir
         )
         callbacks.append(test_callback)
-        print(f"🧪 テストコールバック設定: interval={config.test.interval}")
+        print(f"🧪 Test callback configured: interval={config.test.interval}")
     else:
-        print("🧪 テストコールバックなし")
+        print("🧪 No test callback configured")
+    
+    return callbacks
 
-    # データセットの読み込み
-    print("📂 データセットを読み込み中...")
+
+def main(config):
+    """Main training function.
+    
+    Args:
+        config: Configuration object with all training parameters
+    """
+    
+    # Set CUDA environment
+    os.environ["CUDA_VISIBLE_DEVICES"] = config.cuda_visible_devices
+
+    # Create LoRA configuration
+    lora_config = create_lora_config(config.lora if hasattr(config, 'lora') else None)
+    
+    # Create training arguments
+    training_args = create_training_arguments(config)
+    
+    # Initialize LLASA instance (includes XCodec2)
+    print("🎯 Creating LLASA instance...")
+    llasa = LLASA.from_pretrained(lora_path=config.model_name)
+
+    # Create data collator for completion-only training
+    collator = DataCollatorForCompletionOnlyLM(
+        SPEECH_GENERATION_START,
+        tokenizer=llasa.tokenizer,
+    )
+    
+    # Create callbacks
+    callbacks = create_callbacks(config, llasa)
+
+    # Load dataset
+    print("📂 Loading dataset...")
     train_dataset = load_dataset(config.data_dir)
 
-    # トレーナー
+    # Create trainer
     trainer = SFTTrainer(
         model=llasa.model,
         tokenizer=llasa.tokenizer,
@@ -82,13 +131,16 @@ def main(config):
         peft_config=lora_config,
     )
     
-    print("学習を開始します...")
+    # Start training
+    print("🚀 Starting training...")
     trainer.train()
     
-    print("モデルを保存中...")
+    # Save model
+    print("💾 Saving model...")
     trainer.save_model()
     
-    print("学習完了！")
+    print("✅ Training complete!")
+
 
 if __name__ == "__main__":
     main()
