@@ -69,6 +69,15 @@ python create_dataset.py <音声フォルダ> <テキストファイル> -o data
 2. XCodec2で音声コードに変換
 3. テキストと音声コードをJSONL形式で保存
 
+### 🚀 データセット作成の最適化
+
+処理速度を向上させるオプション：
+
+```bash
+# bfloat16精度で高速処理（A100などで効果的）
+python create_dataset.py <音声フォルダ> <テキストファイル> -o dataset/data.jsonl --bf16
+```
+
 ## 🎓 トレーニング
 
 ### 1. 設定ファイルの準備
