@@ -69,6 +69,15 @@ python create_dataset.py <音声フォルダ> <テキストファイル> -o data
 2. XCodec2で音声コードに変換
 3. テキストと音声コードをJSONL形式で保存
 
+### 🚀 データセット作成の最適化
+
+処理速度を向上させるオプション：
+
+```bash
+# bfloat16精度で高速処理（A100などで効果的）
+python create_dataset.py <音声フォルダ> <テキストファイル> -o dataset/data.jsonl --bf16
+```
+
 ## 🎓 トレーニング
 
 ### 1. 設定ファイルの準備
@@ -113,9 +122,36 @@ python main.py --config config/my_config.yaml
 
 ### Gradio UIの起動
 
+基本的な使い方：
 ```bash
 python gradio_tts_ui.py [モデルパス]
 ```
+
+### 🚀 推論最適化オプション
+
+パフォーマンスを向上させるための最適化オプション：
+
+```bash
+# torch.compile()を使用（PyTorch 2.0+で高速化）
+python gradio_tts_ui.py --compile
+
+# bfloat16精度を使用（A100などで高速化・メモリ効率向上）
+python gradio_tts_ui.py --bf16
+
+# 両方のオプションを組み合わせて最大パフォーマンス
+python gradio_tts_ui.py --compile --bf16
+
+# カスタムモデルパスと最適化オプション
+python gradio_tts_ui.py ./trained/MyModel --compile --bf16
+```
+
+**最適化の効果:**
+- `--compile`: PyTorchの最新コンパイラによる高速化（初回起動は遅いが、推論速度が向上）
+- `--bf16`: bfloat16精度による高速化とメモリ使用量削減（A100、H100などで効果的）
+
+**推奨設定:**
+- A100/H100 GPU: `--compile --bf16`
+- その他のGPU: `--compile`（float16が自動選択）
 
 ## 📖 主要なスクリプト
 
