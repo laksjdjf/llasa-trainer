@@ -5,9 +5,9 @@
 import gradio as gr
 import os
 import time
+import argparse
 from modules.llasa import LLASA
 from modules.llasa_utils import normalize_text
-import sys
 
 # CUDA設定
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -92,9 +92,19 @@ with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
     )
 
 if __name__ == "__main__":
-    llasa_model = sys.argv[1] if len(sys.argv) > 1 else "./lora_checkpoints"
+    parser = argparse.ArgumentParser(description="LLASA TTS Gradio UI")
+    parser.add_argument("model_path", nargs="?", default="./lora_checkpoints", help="Path to the LLASA model")
+    parser.add_argument("--compile", action="store_true", help="Use torch.compile() for optimization (PyTorch 2.0+)")
+    parser.add_argument("--bf16", action="store_true", help="Use bfloat16 precision (recommended for A100)")
+    args = parser.parse_args()
     
-    # LLASAモデル初期化
-    llasa = LLASA.from_pretrained(llasa_model)
+    print("=" * 50)
+    print("🚀 最適化オプション:")
+    print(f"  - torch.compile(): {'有効' if args.compile else '無効'}")
+    print(f"  - bfloat16: {'有効' if args.bf16 else '無効 (float16)'}")
+    print("=" * 50)
+    
+    # LLASAモデル初期化（最適化オプション付き）
+    llasa = LLASA.from_pretrained(args.model_path, compile_model=args.compile, use_bf16=args.bf16)
     llasa.model.merge_and_unload()
     demo.launch()
