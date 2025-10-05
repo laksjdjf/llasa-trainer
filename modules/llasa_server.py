@@ -1,14 +1,10 @@
 import torch
-import tempfile
-import soundfile as sf
 import requests
-import json
-import re
 from transformers import Xcodec2Model, Xcodec2FeatureExtractor
 from modules.llasa_utils import get_prompt
+from modules.llasa import BaseAudioDecoder
 
-
-class LLASAServerClient:
+class LLASAServerClient(BaseAudioDecoder):
     def __init__(self, server_url="http://localhost:8000", codec_model=None, feature_extractor=None):
         """LLASA サーバー版クライアント
         
@@ -18,9 +14,8 @@ class LLASAServerClient:
             feature_extractor: XCodec2 feature extractor（既に読み込み済みの場合）
         """
         
+        super().__init__(codec_model, feature_extractor)
         self.server_url = server_url.rstrip('/')
-        self.codec_model = codec_model
-        self.feature_extractor = feature_extractor
         
         # 特殊トークンID（固定値）
         self.speech_start_id = 128264  # <|s_0|>
@@ -80,31 +75,28 @@ class LLASAServerClient:
             return None, f"API エラー: {response}"
     
     @torch.no_grad()
-    def generate(
+    def generate_tokens(
         self,
-        text: str,
+        prompt: str,
         temperature: float = 0.7,
         top_p: float = 0.9,
         repeat_penalty: float = 1.1,
         max_tokens: int = 300,
-    ) -> tuple[str, str, str]:
-        """テキストから音声を生成（サーバー版）
+    ) -> list[int]:
+        """テキストから音声トークンを生成（サーバー版）
         
         Returns:
-            tuple[audio_path, status_msg, token_info]
+            list[int]: 生成された音声トークン列
         """
-        
-        # プロンプト作成
-        prompt = get_prompt(text)
         
         # サーバーで生成
         generated_text, error = self._call_server(prompt, temperature, top_p, max_tokens, repeat_penalty)
         
         if error:
-            return None, f"❌ 生成エラー: {error}", ""
+            raise RuntimeError(f"生成エラー: {error}")
         
         if not generated_text:
-            return None, "❌ 空のレスポンスが返されました", ""
+            raise RuntimeError("空のレスポンスが返されました")
         
         # 生成されたテキストを音声トークンIDに変換
         # extract_speech_ids関数を参考にした実装
@@ -146,35 +138,7 @@ class LLASAServerClient:
             else:
                 print(f"⚠️ 範囲外の音声ID: {speech_id}")
         
-        if not speech_ids:
-            return None, "❌ 有効な音声IDが生成されませんでした", ""
-        
-        try:
-            # 音声波形生成
-            speech_codes = torch.tensor(speech_ids, dtype=torch.long).to('cuda:0').unsqueeze(0).unsqueeze(0)
-            gen_wav = self.codec_model.decode(speech_codes).audio_values
-            
-            # ファイル保存
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
-                sf.write(tmp_file.name, gen_wav[0, 0, :].cpu().numpy(), 16000)
-                audio_path = tmp_file.name
-            
-            status_msg = f"✅ サーバー生成完了 ({len(speech_ids)} tokens)"
-            token_info = str(speech_ids)  # 最初の100トークンのみ
-            
-            return audio_path, status_msg, token_info
-            
-        except Exception as e:
-            return None, f"❌ 音声デコードエラー: {e}", ""
-    
-    def __enter__(self):
-        """コンテキストマネージャー対応"""
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """リソースクリーンアップ"""
-        pass
-
+        return speech_ids
 
 # 完全互換のためのエイリアス
 LLASA = LLASAServerClient

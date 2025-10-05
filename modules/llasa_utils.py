@@ -84,12 +84,15 @@ def extract_speech_ids(speech_tokens_str):
             print(f"Unexpected token: {token_str}")
     return speech_ids
 
-def get_prompt(text: str, code: list[int] | None = None) -> str:
+def get_prompt(text: str, code: list[int] | None = None, add_end_token: bool = True) -> str:
+    text = normalize_text(text)
     prompt = PROMPT_FORMAT.format(text=text)
+
     if code:
         speech_tokens = ids_to_speech_tokens(code)
         prompt += "".join(speech_tokens)
-        prompt += "<|SPEECH_GENERATION_END|>"
+        if add_end_token:
+            prompt += "<|SPEECH_GENERATION_END|>"
     return prompt
 
 class SpeechOnlyProcessor(LogitsProcessor):

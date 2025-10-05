@@ -29,6 +29,22 @@ def generate_speech(text: str, temperature: float = 0.7, top_p: float = 0.9, rep
     
     return audio_path, status_with_time, tokens
 
+def generate_multilines(text: str, temperature: float = 0.7, top_p: float = 0.9, repeat_penalty: float = 1.0, max_tokens: int = 300):
+    """複数行テキストの音声生成"""
+    start_time = time.time()
+    
+    audio_path, status, tokens = llasa.generate_multilines(text, temperature, top_p, repeat_penalty, max_tokens)
+    
+    elapsed_time = time.time() - start_time
+    
+    # ステータスに時間情報を追加
+    if audio_path:
+        status_with_time = f"✅ 生成完了！ ⏱️ {elapsed_time:.2f}秒 {len(tokens.split())} tokens {len(tokens.split())/elapsed_time:.1f}t/s"
+    else:
+        status_with_time = f"❌ {status} ⏱️ {elapsed_time:.2f}秒"
+    
+    return audio_path, status_with_time, tokens
+
 # Gradio UI
 with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🎤 LLASA-3B TTS")
@@ -52,7 +68,9 @@ with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
                 repeat_penalty = gr.Slider(0.1, 2.0, 1.1, step=0.01, label="Repeat Penalty")
             
             max_tokens = gr.Slider(50, 2000, 500, step=25, label="最大トークン数")
-            generate_btn = gr.Button("🎵 音声生成", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("🎵 音声生成", variant="primary", size="lg")
+                generate_multilines_btn = gr.Button("🎵 複数行生成", variant="secondary", size="lg")
         
         with gr.Column(scale=1):
             audio_output = gr.Audio(label="生成音声", type="filepath")
@@ -75,6 +93,12 @@ with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
     # イベント設定
     generate_btn.click(
         generate_speech,
+        inputs=[text_input, temperature, top_p, repeat_penalty, max_tokens],
+        outputs=[audio_output, status_output, token_output]
+    )
+
+    generate_multilines_btn.click(
+        generate_multilines,
         inputs=[text_input, temperature, top_p, repeat_penalty, max_tokens],
         outputs=[audio_output, status_output, token_output]
     )

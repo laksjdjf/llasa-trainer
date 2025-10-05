@@ -6,7 +6,112 @@ from peft import AutoPeftModelForCausalLM
 from modules.llasa_utils import get_prompt, SpeechOnlyProcessor
 
 
-class LLASA:
+class BaseAudioDecoder:
+    """XCodec2デコード機能の共通基底クラス"""
+    
+    def __init__(self, codec_model=None, feature_extractor=None):
+        self.codec_model = codec_model
+        self.feature_extractor = feature_extractor
+    
+    @torch.no_grad()
+    def decode_tokens(self, speech_ids: list[int]) -> str:
+        """音声トークンからwav波形を生成
+        
+        Args:
+            speech_ids: 音声トークン列
+            
+        Returns:
+            str: 生成されたwavファイルのパス
+        """
+        if not speech_ids:
+            raise ValueError("音声トークンが空です")
+        
+        # 音声波形生成
+        speech_codes = torch.tensor(speech_ids, dtype=torch.long).to('cuda:0').unsqueeze(0).unsqueeze(0)
+        gen_wav = self.codec_model.decode(speech_codes).audio_values
+        
+        # ファイル保存
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
+            sf.write(tmp_file.name, gen_wav[0, 0, :].cpu().numpy(), 16000)
+            audio_path = tmp_file.name
+        
+        return audio_path
+    
+    @torch.no_grad()
+    def generate(
+        self,
+        text: str,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        repeat_penalty: float = 1.1,
+        max_tokens: int = 300,
+    ) -> tuple[str, str, str]:
+        """テキストから音声を生成（サーバー版）
+        
+        Returns:
+            tuple[audio_path, status_msg, token_info]
+        """
+        
+        # トークン生成
+        prompt = get_prompt(text)
+        try:
+            speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens)
+        except RuntimeError as e:
+            return None, f"❌ {str(e)}", ""
+        
+        if not speech_ids:
+            return None, "❌ 有効な音声IDが生成されませんでした", ""
+        
+        # デコード
+        try:
+            audio_path = self.decode_tokens(speech_ids)
+            status_msg = f"✅ サーバー生成完了 ({len(speech_ids)} tokens)"
+            token_info = str(speech_ids)
+            
+            return audio_path, status_msg, token_info
+            
+        except Exception as e:
+            return None, f"❌ 音声デコードエラー: {e}", ""
+        
+    def generate_multilines(
+        self,
+        text: str,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        repeat_penalty: float = 1.1,
+        max_tokens: int = 300,
+    ):
+        
+        texts = [line.strip() for line in text.splitlines() if line.strip()]
+        speech_ids = []
+
+        all_speech_ids = []
+        pre_line = ""
+        for line in texts:
+            prompt = get_prompt(pre_line + line, speech_ids, add_end_token=False)
+            pre_line = line + "。" if not line.endswith("。") else line
+            try:
+                speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens)
+                all_speech_ids.extend(speech_ids)
+            except RuntimeError as e:
+                print(f"❌ {str(e)}")
+                continue
+
+        if not all_speech_ids:
+            return None, "❌ 有効な音声IDが生成されませんでした", ""
+
+        # デコード
+        try:
+            audio_path = self.decode_tokens(all_speech_ids)
+            status_msg = f"✅ サーバー生成完了 ({len(all_speech_ids)} tokens)"
+            token_info = str(all_speech_ids)
+            
+            return audio_path, status_msg, token_info
+            
+        except Exception as e:
+            return None, f"❌ 音声デコードエラー: {e}", ""
+
+class LLASA(BaseAudioDecoder):
     def __init__(self, model=None, tokenizer=None, codec_model=None, feature_extractor=None):
         """LLASA-3B TTS モデルを初期化
         
@@ -16,10 +121,9 @@ class LLASA:
             codec_model: XCodec2モデル（既に読み込み済みの場合）
         """
         
+        super().__init__(codec_model, feature_extractor)
         self.model = model
         self.tokenizer = tokenizer
-        self.codec_model = codec_model
-        self.feature_extractor = feature_extractor
         self.logits_processor = SpeechOnlyProcessor(tokenizer=self.tokenizer, device=model.device, dtype=next(model.parameters()).dtype)
         self.speech_start_id = self.tokenizer.convert_tokens_to_ids('<|s_0|>')
         self.speech_end_id = self.tokenizer.convert_tokens_to_ids('<|SPEECH_GENERATION_END|>')
@@ -54,22 +158,19 @@ class LLASA:
         return cls(model=model, tokenizer=tokenizer, codec_model=codec_model, feature_extractor=feature_extractor)
     
     @torch.no_grad()
-    def generate(
+    def generate_tokens(
         self,
-        text: str,
+        prompt: str,
         temperature: float = 0.7,
         top_p: float = 0.9,
         repeat_penalty: float = 1.1,
         max_tokens: int = 300,
-    ) -> tuple[str, str, str]:
-        """テキストから音声を生成
+    ) -> list[int]:
+        """テキストから音声トークンを生成
         
         Returns:
-            tuple[audio_path, status_msg, token_info]
+            list[int]: 生成された音声トークン列
         """
-        
-        # プロンプト作成
-        prompt = get_prompt(text)
         
         # トークン化
         input_ids = self.tokenizer(prompt, return_tensors='pt').to('cuda:0')
@@ -104,19 +205,4 @@ class LLASA:
                 speech_id = token_id_val - self.speech_start_id
                 speech_ids.append(speech_id)
         
-        if not speech_ids:
-            return None, "❌ 有効な音声トークンが生成されませんでした", ""
-        
-        # 音声波形生成
-        speech_codes = torch.tensor(speech_ids, dtype=torch.long).to('cuda:0').unsqueeze(0).unsqueeze(0)
-        gen_wav = self.codec_model.decode(speech_codes).audio_values
-        
-        # ファイル保存
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
-            sf.write(tmp_file.name, gen_wav[0, 0, :].cpu().numpy(), 16000)
-            audio_path = tmp_file.name
-        
-        status_msg = f"✅ 生成完了 ({len(speech_ids)} tokens)"
-        token_info = str(speech_ids)
-        
-        return audio_path, status_msg, token_info
+        return speech_ids
