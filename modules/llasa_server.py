@@ -57,7 +57,8 @@ class LLASAServerClient(BaseAudioDecoder):
             "top_p": top_p,
             "max_tokens": max_tokens,
             "min_tokens": min_tokens,
-            "repetition_penalty": repeat_penalty,
+            "repetition_penalty": repeat_penalty, # vllm
+            "repeat_penalty": repeat_penalty, # llama.cpp
             "stop_token_ids": [self.speech_end_id],  # 直接トークンIDを指定
             "stream": False
         }
