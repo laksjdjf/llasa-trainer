@@ -93,6 +93,8 @@ def get_prompt(text: str, code: list[int] | None = None, add_end_token: bool = T
         prompt += "".join(speech_tokens)
         if add_end_token:
             prompt += "<|SPEECH_GENERATION_END|>"
+        else:
+            prompt += "<|SPEECH_GENERATION_END|><|SPEECH_GENERATION_START|>"
     return prompt
 
 class SpeechOnlyProcessor(LogitsProcessor):
