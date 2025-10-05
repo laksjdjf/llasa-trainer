@@ -87,11 +87,12 @@ class BaseAudioDecoder:
 
         all_speech_ids = []
         pre_line = ""
-        for line in texts:
+        for i, line in enumerate(texts):
             prompt = get_prompt(pre_line + line, speech_ids, add_end_token=False)
             pre_line = line + "。" if not line.endswith("。") else line
             try:
-                speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens)
+                speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens, min_tokens=10)
+                print(F"generated {i+1}/{len(texts)} line: {len(line)} chars -> {len(speech_ids)} speech_ids")
                 all_speech_ids.extend(speech_ids)
             except RuntimeError as e:
                 print(f"❌ {str(e)}")
@@ -165,6 +166,7 @@ class LLASA(BaseAudioDecoder):
         top_p: float = 0.9,
         repeat_penalty: float = 1.1,
         max_tokens: int = 300,
+        min_tokens: int = 0,
     ) -> list[int]:
         """テキストから音声トークンを生成
         
@@ -179,6 +181,7 @@ class LLASA(BaseAudioDecoder):
         outputs = self.model.generate(
             **input_ids,
             max_new_tokens=max_tokens,
+            min_new_tokens=min_tokens,
             eos_token_id=self.speech_end_id,
             do_sample=True,
             top_p=top_p,

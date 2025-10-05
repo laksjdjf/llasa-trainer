@@ -47,7 +47,7 @@ class LLASAServerClient(BaseAudioDecoder):
         print(f"✅ LLASA サーバークライアント準備完了 (vLLMサーバー: {server_url})")
         return client
     
-    def _call_server(self, prompt: str, temperature: float, top_p: float, max_tokens: int, repeat_penalty: float):
+    def _call_server(self, prompt: str, temperature: float, top_p: float, max_tokens: int, repeat_penalty: float, min_tokens: int):
         """サーバーAPIを呼び出し"""
         
         data = {
@@ -56,6 +56,7 @@ class LLASAServerClient(BaseAudioDecoder):
             "temperature": temperature,
             "top_p": top_p,
             "max_tokens": max_tokens,
+            "min_tokens": min_tokens,
             "repetition_penalty": repeat_penalty,
             "stop_token_ids": [self.speech_end_id],  # 直接トークンIDを指定
             "stream": False
@@ -82,6 +83,7 @@ class LLASAServerClient(BaseAudioDecoder):
         top_p: float = 0.9,
         repeat_penalty: float = 1.1,
         max_tokens: int = 300,
+        min_tokens: int = 0,
     ) -> list[int]:
         """テキストから音声トークンを生成（サーバー版）
         
@@ -90,7 +92,7 @@ class LLASAServerClient(BaseAudioDecoder):
         """
         
         # サーバーで生成
-        generated_text, error = self._call_server(prompt, temperature, top_p, max_tokens, repeat_penalty)
+        generated_text, error = self._call_server(prompt, temperature, top_p, max_tokens, repeat_penalty, min_tokens)
         
         if error:
             raise RuntimeError(f"生成エラー: {error}")
