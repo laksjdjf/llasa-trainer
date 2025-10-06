@@ -93,6 +93,8 @@ class LLASAServerClient(BaseAudioDecoder):
         """
         
         # サーバーで生成
+        if prompt.startswith("<|begin_of_text|>"):
+            prompt = prompt[len("<|begin_of_text|>"):]
         generated_text, error = self._call_server(prompt, temperature, top_p, max_tokens, repeat_penalty, min_tokens)
         
         if error:

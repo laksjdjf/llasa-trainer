@@ -54,12 +54,13 @@ with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
             text_input = gr.Textbox(
                 label="テキスト入力",
                 value="",
-                lines=3
+                lines=5
             )
 
             normalized_text = gr.Textbox(
                 label="正規化テキスト",
-                interactive=False
+                interactive=False,
+                lines=5
             )
             
             with gr.Row():
@@ -117,16 +118,16 @@ with gr.Blocks(title="LLASA TTS", theme=gr.themes.Soft()) as demo:
 
 if __name__ == "__main__":
     llasa_model = sys.argv[1] if len(sys.argv) > 1 else "./lora_checkpoints"
-    vllm_mode = llasa_model == "vllm"
+    server_mode = llasa_model == "vllm" or llasa_model == "server"
     
     # LLASAモデル初期化
-    if vllm_mode:
+    if server_mode:
         from modules.llasa_server import LLASA
     else:
         from modules.llasa import LLASA
     
     llasa = LLASA.from_pretrained(llasa_model)
-    if not vllm_mode:
+    if not server_mode:
         if hasattr(llasa.model, 'merge_and_unload'):
             llasa.model.merge_and_unload()
         llasa.model = torch.compile(llasa.model)
