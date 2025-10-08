@@ -137,17 +137,10 @@ class LLASA(BaseAudioDecoder):
         
         # モデル読み込み
         print("📦 LoRAモデル読み込み中...")
-        try:
-            model = AutoPeftModelForCausalLM.from_pretrained(
-                lora_path,
-                dtype=torch.float16,
-            ).eval().to('cuda:0')
-        except:
-            print("⚠️ 通常モデルとして再試行中...")
-            model = AutoModelForCausalLM.from_pretrained(
-                lora_path,
-                dtype=torch.float16,
-            ).eval().to('cuda:0')
+        model = AutoPeftModelForCausalLM.from_pretrained(
+            lora_path,
+            dtype=torch.float16,
+        ).eval().to('cuda:0')
         
         print("📝 トークナイザー読み込み中...")
         tokenizer = AutoTokenizer.from_pretrained(lora_path)
