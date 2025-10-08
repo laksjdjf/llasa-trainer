@@ -114,8 +114,32 @@ python main.py --config config/my_config.yaml
 ### Gradio UIの起動
 
 ```bash
-python gradio_tts_ui.py [モデルパス]
+python app.py -m [モデルパス] -c [コーデックモデルパス]
 ```
+
+#### コマンドライン引数
+
+- `-m, --model_path`: モデルのパス（デフォルト: `server`）
+- `-c, --codec_model_path`: コーデックモデルのパス（デフォルト: `Anime-XCodec2-hf`）
+- `--host`: ホスト名（省略可）
+- `--port`: ポート番号（デフォルト: 7860）
+- `--cuda_visible_devices`: 使用するCUDAデバイス（デフォルト: `0`）
+
+#### UIの機能
+
+起動後、以下の3つのタブが利用可能です：
+
+1. **🗣️ TTS**: テキストから音声を生成
+   - テキスト入力と参照音声を使用した音声生成
+   - Temperature、Top-p、Repeat Penaltyなどの生成パラメータ調整
+   - 音声の自動文字起こし機能
+
+2. **🔤 トークナイザー**: 音声のトークン化と復元
+   - 音声ファイルを音声トークンに変換
+   - 音声トークンから音声を復元
+
+3. **🎤 類似度計算**: 音声間の類似度を計算
+   - ターゲット音声と複数の参照音声の類似度を測定
 
 ## 📖 主要なスクリプト
 
@@ -123,7 +147,7 @@ python gradio_tts_ui.py [モデルパス]
 |----------|------|
 | `main.py` | トレーニングのメインスクリプト |
 | `create_dataset.py` | データセット作成ツール |
-| `gradio_tts_ui.py` | Gradio WebUIの起動 |
+| `app.py` | Gradio WebUIの起動 |
 | `modules/llasa.py` | LLASAモデルクラス |
 | `modules/train.py` | トレーニングロジック |
 | `modules/llasa_utils.py` | ユーティリティ関数 |
@@ -140,10 +164,15 @@ llasa-trainer/
 │   ├── llasa_utils.py        # ユーティリティ
 │   ├── train.py              # トレーニングロジック
 │   └── train_utils.py        # トレーニングユーティリティ
+├── ui/
+│   ├── llasa_processor.py    # LLASAモデル処理
+│   ├── tts.py                # TTSインターフェース
+│   ├── tokenizer.py          # トークナイザーインターフェース
+│   └── similarity.py         # 類似度計算インターフェース
 ├── script/
 │   └── convert_weight_norm_key.py  # XCodec2変換スクリプト
+├── app.py                    # Gradio UI
 ├── create_dataset.py         # データセット作成
-├── gradio_tts_ui.py          # Gradio UI
 ├── main.py                   # トレーニングメイン
 └── requirements.txt          # 依存関係
 ```
