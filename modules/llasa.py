@@ -74,7 +74,7 @@ class BaseAudioDecoder:
         """
         
         text = reference_text + text if reference_text else text
-        reference_codes = self.encode_tokens(reference_audio) if reference_audio else None
+        reference_codes = self.encode_audio(reference_audio) if reference_audio else None
         prompt = get_prompt(text, reference_codes, add_bos_token=True, add_end_token=False)
         speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens)
         
@@ -96,9 +96,9 @@ class BaseAudioDecoder:
         )
 
     def transcribe(self, audio_path: str) -> str:
+        """音声ファイルをテキストに文字起こし"""
         if not hasattr(self, 'whisper'):
             self.load_whisper()
-        """音声ファイルをテキストに文字起こし"""
     
         generate_kwargs = {
             "language": "Japanese",

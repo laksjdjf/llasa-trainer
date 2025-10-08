@@ -30,7 +30,7 @@ def generate_speech(
         num_tokens = len(tokens)
         status_with_time = f"✅ 生成完了！ ⏱️ {elapsed_time:.2f}秒 | {num_tokens} tokens | {num_tokens/elapsed_time:.2f} t/s"
     else:
-        status_with_time = f"❌ 生成失敗^q^ ⏱️ {elapsed_time:.2f}秒"
+        status_with_time = f"❌ 生成失敗 ⏱️ {elapsed_time:.2f}秒"
     
     return audio_path, status_with_time, str(tokens)
 
