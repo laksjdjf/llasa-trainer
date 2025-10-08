@@ -1,5 +1,4 @@
 import os
-
 from transformers import TrainingArguments
 from peft import LoraConfig
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
@@ -15,24 +14,23 @@ def main(config):
     os.environ["CUDA_VISIBLE_DEVICES"] = config.cuda_visible_devices
 
     # LoRA設定（nullの場合はFFTを使用）
-    lora_config = None
     if config.lora is not None:
         lora_config = LoraConfig(
             r=config.lora.r,
             lora_alpha=config.lora.lora_alpha,
+            target_modules=list(config.lora.target_modules),
             lora_dropout=config.lora.lora_dropout,
             bias=config.lora.bias,
-            target_modules=list(config.lora.target_modules),
-            task_type="CAUSAL_LM"
+            task_type="CAUSAL_LM",
         )
         print(f"🔧 LoRA設定: r={config.lora.r}, alpha={config.lora.lora_alpha}")
     else:
+        lora_config = None
         print("🔧 FFT (Full Fine-tuning) モードを使用")
     
     # 学習設定（動的に引数を取得）
     training_kwargs = {
         "output_dir": config.output_dir,
-        "overwrite_output_dir": True,
     }
     
     # config.trainingの全ての設定を動的に追加
@@ -45,7 +43,7 @@ def main(config):
     
     # LLASAインスタンスを最初に作成（XCodec2も含む）
     print("🎯 LLASAインスタンスを作成中...")
-    llasa = LLASA.from_pretrained(lora_path=config.model_name)
+    llasa = LLASA.from_pretrained(model_path=config.model_name, codec_model_path=config.get('codec_model_name', "Anime-XCodec2-hf"))
 
     collator = DataCollatorForCompletionOnlyLM(
         "<|SPEECH_GENERATION_START|>",
@@ -59,7 +57,7 @@ def main(config):
             llasa=llasa,
             test_text=config.test.text,
             test_interval=config.test.interval,
-            save_path=config.output_dir
+            save_path=os.path.join(config.output_dir, "samples")
         )
         callbacks.append(test_callback)
         print(f"🧪 テストコールバック設定: interval={config.test.interval}")
@@ -67,7 +65,6 @@ def main(config):
         print("🧪 テストコールバックなし")
 
     # データセットの読み込み
-    print("📂 データセットを読み込み中...")
     train_dataset = load_dataset(config.data_dir)
 
     # トレーナー
@@ -81,12 +78,24 @@ def main(config):
         callbacks=callbacks,
         peft_config=lora_config,
     )
+
+    # ステップ0でテスト生成
+    if callbacks:
+        print("\n--- 初期状態でのテスト生成 ---")
+        callbacks[0].test_generation(step=0)
+        print("--- 初期テスト完了 ---\n")
     
     print("学習を開始します...")
     trainer.train()
     
     print("モデルを保存中...")
     trainer.save_model()
+
+    # 最終ステップでテスト生成
+    if callbacks:
+        print("\n--- 最終状態でのテスト生成 ---")
+        callbacks[0].test_generation(step='final')
+        print("--- 最終テスト完了 ---\n")
     
     print("学習完了！")
 

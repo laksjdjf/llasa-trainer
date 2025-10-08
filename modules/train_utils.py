@@ -7,7 +7,7 @@ from modules.llasa_utils import get_prompt
 class TTSTestCallback(TrainerCallback):
     """学習中にTTSのテストを行うコールバック"""
     
-    def __init__(self, llasa, test_text: str = "こんにちは、マスターさん", test_interval: int = 100, save_path: str = "./test_audio"):
+    def __init__(self, llasa, test_text: str = "こんにちは、お元気ですか。", test_interval: int = 100, save_path: str = "./test_audio"):
         self.llasa = llasa
         self.test_text = test_text
         self.test_interval = test_interval
@@ -18,15 +18,15 @@ class TTSTestCallback(TrainerCallback):
         """音声生成をテスト"""
         
         # 短い音声生成でテスト（LLASAが自動でテキスト正規化）
-        audio_path, status, tokens = self.llasa.generate(
+        audio_path, tokens = self.llasa.generate(
             self.test_text,
             temperature=0.7,
             top_p=0.9, 
-            max_tokens=200  # 短めにして高速化
+            max_tokens=300,
         )
         
         if audio_path:
-            print(f"🎵 テスト生成成功: '{self.test_text}' -> {status}")
+            print(f"🎵 テスト生成成功: '{self.test_text}' -> {len(tokens)} tokens")
             
             # 音声ファイルを保存（ステップ番号付き）
             if step is not None:
@@ -38,7 +38,7 @@ class TTSTestCallback(TrainerCallback):
     def on_step_end(self, args, state, control, **kwargs):
         """ステップ終了時に呼ばれる"""
         
-        if (state.global_step % self.test_interval == 0) or (state.global_step == 1) or (state.global_step == args.max_steps - 1):
+        if state.global_step % self.test_interval == 0:
             print(f"\n--- Step {state.global_step}: テスト実行中 ---")
             self.test_generation(step=state.global_step)
             print("--- テスト完了 ---\n")
