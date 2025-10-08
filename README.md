@@ -50,7 +50,20 @@ python venv/lib/python3.12/site-packages/transformers/models/xcodec2/convert_xco
 1. **音声ファイル**: WAV形式の音声ファイル
 2. **テキストファイル**: 音声に対応するテキスト（ファイル名:テキスト形式）
 
+### ディレクトリ構成例
+
+```
+your_dataset/
+├── audio/
+│   ├── file001.wav
+│   ├── file002.wav
+│   └── file003.wav
+└── text.txt
+```
+
 ### テキストファイル形式例
+
+デフォルトでは、`:` (コロン) で区切られたファイルIDとテキストのペアを記述します：
 
 ```
 file001:こんにちは、今日はいい天気ですね。
@@ -58,16 +71,70 @@ file002:ありがとうございます。
 file003:お疲れ様でした。
 ```
 
+**注意**: ファイルIDは音声ファイル名から拡張子を除いたものと一致させる必要があります。
+
 ### データセット作成
+
+#### 基本的な使い方
 
 ```bash
 python create_dataset.py <音声フォルダ> <テキストファイル> -o dataset/data.jsonl
 ```
 
+#### コマンドライン引数
+
+| 引数 | 説明 | デフォルト値 |
+|------|------|------------|
+| `audio_dir` | 音声ファイルが格納されたディレクトリ | (必須) |
+| `text_file` | テキストファイルのパス | (必須) |
+| `-o, --output` | 出力するJSONLファイルのパス | `dataset/data.jsonl` |
+| `--split_word` | テキストファイルの区切り文字 | `:` |
+| `--file_index` | ファイルIDのインデックス（0始まり） | `0` |
+| `--text_index` | テキストのインデックス（0始まり） | `1` |
+| `--ext` | 音声ファイルの拡張子 | `.wav` |
+
+#### 使用例
+
+**基本的な使用例**:
+```bash
+python create_dataset.py ./audio ./text.txt -o dataset/data.jsonl
+```
+
+**タブ区切りのテキストファイルを使用する場合**:
+```bash
+python create_dataset.py ./audio ./text.txt -o dataset/data.jsonl --split_word $'\t'
+```
+
+**カラムの順序が逆の場合（テキスト:ファイルID）**:
+```bash
+python create_dataset.py ./audio ./text.txt -o dataset/data.jsonl --file_index 1 --text_index 0
+```
+
+**MP3ファイルを使用する場合**:
+```bash
+python create_dataset.py ./audio ./text.txt -o dataset/data.jsonl --ext .mp3
+```
+
+#### 処理の流れ
+
 このスクリプトは以下を実行します：
-1. 音声ファイルを読み込み
-2. XCodec2で音声コードに変換
-3. テキストと音声コードをJSONL形式で保存
+
+1. **テキストファイルの読み込み**: 指定されたテキストファイルからファイルIDとテキストのペアを読み込みます
+2. **XCodec2モデルのロード**: Anime-XCodec2-hfモデルを自動的にダウンロード・ロードします
+3. **音声コードへの変換**: 各音声ファイルをXCodec2で音声コード（トークン）に変換します
+4. **JSONL形式での保存**: テキストと音声コードのペアをJSONL形式で保存します
+
+各行は以下の形式のJSON形式で保存されます：
+```json
+{"text": "こんにちは、今日はいい天気ですね。", "code": [1234, 5678, ...]}
+```
+
+#### ヒント
+
+- 音声ファイルは16kHz以上のサンプリングレートを推奨します
+- 長すぎる音声（10秒以上）は学習に時間がかかる可能性があります
+- テキストは事前に正規化されている必要はありません（学習時に自動的に正規化されます）
+- データセット作成には時間がかかるため、初回はGPU環境での実行を推奨します
 
 ## 🎓 トレーニング
 
@@ -114,8 +181,32 @@ python main.py --config config/my_config.yaml
 ### Gradio UIの起動
 
 ```bash
-python gradio_tts_ui.py [モデルパス]
+python app.py -m [モデルパス] -c [コーデックモデルパス]
 ```
+
+#### コマンドライン引数
+
+- `-m, --model_path`: モデルのパス（デフォルト: `server`）
+- `-c, --codec_model_path`: コーデックモデルのパス（デフォルト: `Anime-XCodec2-hf`）
+- `--host`: ホスト名（省略可）
+- `--port`: ポート番号（デフォルト: 7860）
+- `--cuda_visible_devices`: 使用するCUDAデバイス（デフォルト: `0`）
+
+#### UIの機能
+
+起動後、以下の3つのタブが利用可能です：
+
+1. **🗣️ TTS**: テキストから音声を生成
+   - テキスト入力と参照音声を使用した音声生成
+   - Temperature、Top-p、Repeat Penaltyなどの生成パラメータ調整
+   - 音声の自動文字起こし機能
+
+2. **🔤 トークナイザー**: 音声のトークン化と復元
+   - 音声ファイルを音声トークンに変換
+   - 音声トークンから音声を復元
+
+3. **🎤 類似度計算**: 音声間の類似度を計算
+   - ターゲット音声と複数の参照音声の類似度を測定
 
 ## 📖 主要なスクリプト
 
@@ -123,7 +214,7 @@ python gradio_tts_ui.py [モデルパス]
 |----------|------|
 | `main.py` | トレーニングのメインスクリプト |
 | `create_dataset.py` | データセット作成ツール |
-| `gradio_tts_ui.py` | Gradio WebUIの起動 |
+| `app.py` | Gradio WebUIの起動 |
 | `modules/llasa.py` | LLASAモデルクラス |
 | `modules/train.py` | トレーニングロジック |
 | `modules/llasa_utils.py` | ユーティリティ関数 |
@@ -140,10 +231,15 @@ llasa-trainer/
 │   ├── llasa_utils.py        # ユーティリティ
 │   ├── train.py              # トレーニングロジック
 │   └── train_utils.py        # トレーニングユーティリティ
+├── ui/
+│   ├── llasa_processor.py    # LLASAモデル処理
+│   ├── tts.py                # TTSインターフェース
+│   ├── tokenizer.py          # トークナイザーインターフェース
+│   └── similarity.py         # 類似度計算インターフェース
 ├── script/
 │   └── convert_weight_norm_key.py  # XCodec2変換スクリプト
+├── app.py                    # Gradio UI
 ├── create_dataset.py         # データセット作成
-├── gradio_tts_ui.py          # Gradio UI
 ├── main.py                   # トレーニングメイン
 └── requirements.txt          # 依存関係
 ```
