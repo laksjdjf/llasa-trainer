@@ -269,10 +269,11 @@ llasa-trainer/
 - **説明**: 音声認識モデル（文字起こし機能に使用）
 - **ライセンス**: モデルのHugging Faceページでライセンスをご確認ください
 
-#### 4. **spkrec-ecapa-voxceleb**
+#### 4. **spkrec-ecapa-voxceleb (SpeechBrain)**
 - **提供元**: [speechbrain/spkrec-ecapa-voxceleb](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb)
 - **説明**: 話者認識モデル（音声の埋め込みベクトル取得に使用）
-- **ライセンス**: モデルのHugging Faceページでライセンスをご確認ください
+- **ライセンス**: Apache License 2.0 ([SpeechBrain GitHub](https://github.com/speechbrain/speechbrain))
+- **注**: Apache 2.0ライセンスはMITライセンスと互換性があります
 
 ### 重要な注意事項
 
