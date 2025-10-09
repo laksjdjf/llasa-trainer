@@ -243,3 +243,51 @@ llasa-trainer/
 ├── main.py                   # トレーニングメイン
 └── requirements.txt          # 依存関係
 ```
+
+## 📜 ライセンスと謝辞
+
+### このリポジトリのライセンス
+
+このリポジトリのコードは **MIT License** の下で公開されています。詳細は [LICENSE](LICENSE) ファイルをご覧ください。
+
+### 使用している外部モデルとライセンス
+
+このプロジェクトは以下の外部モデルを使用しています。各モデルには独自のライセンスが適用されます：
+
+#### 1. **Anime-Llasa-3B**
+- **提供元**: [NandemoGHS/Anime-Llasa-3B](https://huggingface.co/NandemoGHS/Anime-Llasa-3B)
+- **説明**: ベースとなるLLASA-3B TTSモデル
+- **ライセンス**: モデルのHugging Faceページでライセンスをご確認ください
+
+#### 2. **Anime-XCodec2**
+- **提供元**: [NandemoGHS/Anime-XCodec2](https://huggingface.co/NandemoGHS/Anime-XCodec2)
+- **説明**: 音声エンコーダー/デコーダーモデル
+- **ライセンス**: モデルのHugging Faceページでライセンスをご確認ください
+
+#### 3. **anime-whisper**
+- **提供元**: [litagin/anime-whisper](https://huggingface.co/litagin/anime-whisper)
+- **説明**: 音声認識モデル（文字起こし機能に使用）
+- **ライセンス**: モデルのHugging Faceページでライセンスをご確認ください
+
+#### 4. **spkrec-ecapa-voxceleb (SpeechBrain)**
+- **提供元**: [speechbrain/spkrec-ecapa-voxceleb](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb)
+- **説明**: 話者認識モデル（音声の埋め込みベクトル取得に使用）
+- **ライセンス**: Apache License 2.0 ([SpeechBrain GitHub](https://github.com/speechbrain/speechbrain))
+- **注**: Apache 2.0ライセンスはMITライセンスと互換性があります
+
+### 重要な注意事項
+
+⚠️ **このリポジトリのコードはMITライセンスですが、使用する外部モデルには各モデル独自のライセンスが適用されます。**
+
+- 外部モデルを使用する前に、必ず各モデルのHugging Faceページでライセンス条項を確認してください
+- 商用利用や配布を行う場合は、各モデルのライセンス条項を遵守してください
+- モデルの使用に関する詳細な条件は、各モデルの提供元にお問い合わせください
+
+### 謝辞
+
+以下のプロジェクトとその開発者の皆様に感謝いたします：
+
+- [NandemoGHS](https://huggingface.co/NandemoGHS) 様 - Anime-Llasa-3BおよびAnime-XCodec2モデルの開発と公開
+- [litagin](https://huggingface.co/litagin) 様 - anime-whisperモデルの開発と公開
+- [SpeechBrain](https://speechbrain.github.io/) - spkrec-ecapa-voxcelebモデルの開発と公開
+- Hugging Face Transformers - モデルの統合とツールの提供
