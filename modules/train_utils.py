@@ -3,6 +3,7 @@ import json
 from transformers import TrainerCallback
 from datasets import Dataset
 from modules.llasa_utils import get_prompt
+import random
 
 class TTSTestCallback(TrainerCallback):
     """学習中にTTSのテストを行うコールバック"""
@@ -22,7 +23,7 @@ class TTSTestCallback(TrainerCallback):
             self.test_text,
             temperature=0.7,
             top_p=0.9, 
-            max_tokens=300,
+            max_tokens=1000,
         )
         
         if audio_path:
@@ -54,5 +55,6 @@ def load_dataset(file_path: str):
             samples.append(get_prompt(text=obj["text"], code=obj.get("code")))
 
     # 2) HF Datasets へ
+    random.shuffle(samples)
     train_ds = Dataset.from_dict({"text": samples})
     return train_ds

@@ -31,6 +31,28 @@ def generate(
         reference_audio,
     )
 
+def generate_multiple(
+    texts: list[str],
+    temperature: float = 0.7,
+    top_p: float = 0.9,
+    repeat_penalty: float = 1.1,
+    max_tokens: int = 300,
+    reference_text: str = "",
+    reference_audio: list[int] = None,
+) -> tuple[str, str]:
+    """テキストから音声を生成（複数文対応）"""
+    global llasa
+
+    return llasa.generate_multiple(
+        texts,
+        temperature,
+        top_p,
+        repeat_penalty,
+        max_tokens,
+        reference_text,
+        reference_audio,
+    )
+
 def transcribe(audio_path: str) -> str:
     """音声ファイルをテキストに文字起こし"""
     global llasa

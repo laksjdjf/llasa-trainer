@@ -1,5 +1,5 @@
 import gradio as gr
-from ui.llasa_processor import generate, transcribe
+from ui.llasa_processor import generate, generate_multiple, transcribe
 from modules.llasa_utils import normalize_text
 import time
 
@@ -30,7 +30,31 @@ def generate_speech(
         num_tokens = len(tokens)
         status_with_time = f"✅ 生成完了！ ⏱️ {elapsed_time:.2f}秒 | {num_tokens} tokens | {num_tokens/elapsed_time:.2f} t/s"
     else:
-        status_with_time = f"❌ 生成失敗 ⏱️ {elapsed_time:.2f}秒"
+        status_with_time = f"❌ 生成失敗^q^ ⏱️ {elapsed_time:.2f}秒"
+    
+    return audio_path, status_with_time, str(tokens)
+
+def generate_multiple_speech(
+    text: str,
+    reference_text: str,
+    reference_audio: str,
+    temperature: float = 0.7,
+    top_p: float = 0.9,
+    repeat_penalty: float = 1.0,
+    max_tokens: int = 300
+):
+    """時間計測付き複数文音声生成"""
+    start_time = time.time()
+    texts = [s.strip() for s in text.splitlines() if s.strip()]
+    audio_path, tokens = generate_multiple(texts, temperature, top_p, repeat_penalty, max_tokens, reference_text, reference_audio)
+    elapsed_time = time.time() - start_time
+    
+    # ステータスに時間情報を追加
+    if audio_path:
+        num_tokens = len(tokens)
+        status_with_time = f"✅ 生成完了！ ⏱️ {elapsed_time:.2f}秒 | {num_tokens} tokens | {num_tokens/elapsed_time:.2f} t/s"
+    else:
+        status_with_time = f"❌ 生成失敗^q^ ⏱️ {elapsed_time:.2f}秒"
     
     return audio_path, status_with_time, str(tokens)
 
@@ -50,7 +74,9 @@ def tts_interface():
                     reference_audio = gr.Audio(label="🎧 参照音声 (オプション)", type="filepath", scale=8)
                     transcribe_audio_btn = gr.Button("📝 文字起こし", scale=2)
                 reference_text = gr.Textbox(label="🔤 参照テキスト (オプション)", placeholder="参照音声の内容を入力してください...", lines=3)
-                generate_button = gr.Button("▶️ 音声生成", variant="primary")
+                with gr.Row():
+                    generate_button = gr.Button("▶️ 音声生成", variant="primary")
+                    generate_multiple_button = gr.Button("▶️ 複数文生成", variant="secondary")
 
                 with gr.Row():
                     temperature = gr.Slider(0.0, 1.0, value=0.7, step=0.01, label="🌡️ Temperature")
@@ -74,6 +100,14 @@ def tts_interface():
     
         generate_button.click(
             fn=generate_speech,
+            inputs=[
+                text_input, reference_text, reference_audio, temperature, top_p, repeat_penalty, max_tokens
+            ],
+            outputs=[audio_output, status_output, tokens]
+        )
+
+        generate_multiple_button.click(
+            fn=generate_multiple_speech,
             inputs=[
                 text_input, reference_text, reference_audio, temperature, top_p, repeat_penalty, max_tokens
             ],

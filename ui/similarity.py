@@ -8,7 +8,8 @@ def calculate_similarity(target, references):
     similarities = calc_similarity(target, references)
     similarity_dict = {Path(ref).name: sim for ref, sim in zip(references, similarities)}
 
-    return similarity_dict, "✅ 類似度計算完了！"
+    similarity_csv = "\n".join([f"{k},{v:.4f}" for k, v in similarity_dict.items()])
+    return similarity_dict, similarity_csv, "✅ 類似度計算完了！"
 
 def similarity_interface():
     """音声類似度計算UIを作成"""
@@ -27,12 +28,13 @@ def similarity_interface():
                     label="📊 類似度結果",
                     num_top_classes=10,
                 )
+                similarity_table = gr.Textbox(label="類似度詳細", interactive=False)
                 status_output = gr.Textbox(label="📈 ステータス", interactive=False)
         
         calc_btn.click(
             calculate_similarity,
             inputs=[target_audio, reference_audios],
-            outputs=[similarity_output, status_output]
+            outputs=[similarity_output, similarity_table, status_output],
         )
     
     return app

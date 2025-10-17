@@ -66,6 +66,8 @@ class BaseAudioDecoder:
         max_tokens: int = 300,
         reference_text: str = "",
         reference_audio: list[int] = None,
+        reference_codes: list[int] = None,
+        decode_audio: bool = True,
     ) -> tuple[str, str]:
         """テキストから音声を生成（サーバー版）
         
@@ -74,16 +76,49 @@ class BaseAudioDecoder:
         """
         
         text = reference_text + text if reference_text else text
-        reference_codes = self.encode_audio(reference_audio) if reference_audio else None
+        reference_codes = reference_codes or (self.encode_audio(reference_audio) if reference_audio else None)
         prompt = get_prompt(text, reference_codes, add_bos_token=True, add_end_token=False)
         speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens)
         
-        if not speech_ids:
+        if not speech_ids or not decode_audio:
             return None, speech_ids
         
         audio_path = self.decode_tokens(speech_ids)
         
         return audio_path, speech_ids
+    
+    @torch.no_grad()
+    def generate_multiple(
+        self,
+        texts: list[str],
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        repeat_penalty: float = 1.1,
+        max_tokens: int = 300,
+        reference_text: str = "",
+        reference_audio: list[int] = None,
+    ) -> tuple[str, str]:
+        """テキストから音声を生成（サーバー版・複数文対応）
+        
+        Returns:
+            tuple[audio_path, status_msg, token_info]
+        """
+        
+        speech_ids_list = []
+        reference_codes = self.encode_audio(reference_audio) if reference_audio else None
+        for i, text in enumerate(texts):
+            _, speech_ids = self.generate(text,temperature,top_p,repeat_penalty,max_tokens,reference_text,reference_audio=None,reference_codes=reference_codes,decode_audio=False)
+            if i < len(texts) - 1:
+                speech_ids = speech_ids[:-16]
+            speech_ids_list.extend(speech_ids)
+            reference_text = text
+            reference_codes = speech_ids
+
+        if not speech_ids_list:
+            return None, speech_ids_list
+        
+        audio_path = self.decode_tokens(speech_ids_list)
+        return audio_path, speech_ids_list
     
     def load_whisper(self, model_path: str = "litagin/anime-whisper"):
         self.whisper = pipeline(
@@ -96,9 +131,9 @@ class BaseAudioDecoder:
         )
 
     def transcribe(self, audio_path: str) -> str:
-        """音声ファイルをテキストに文字起こし"""
         if not hasattr(self, 'whisper'):
             self.load_whisper()
+        """音声ファイルをテキストに文字起こし"""
     
         generate_kwargs = {
             "language": "Japanese",
@@ -110,18 +145,15 @@ class BaseAudioDecoder:
     
     def load_classifier(self):
         """話者認識モデルの読み込み"""
-        from speechbrain.inference.speaker import EncoderClassifier
-        self.classifier = EncoderClassifier.from_hparams(
-            source="speechbrain/spkrec-ecapa-voxceleb",
-        )
+        from anime_speaker_embedding import AnimeSpeakerEmbedding
+        self.classifier = AnimeSpeakerEmbedding(device="cuda", variant="char") 
 
     def get_embedding(self, audio_path: str):
         """話者認識モデルで音声の埋め込みベクトルを取得"""
         if not hasattr(self, 'classifier'):
             self.load_classifier()
-        audio = preprocess_audio(audio_path).unsqueeze(0)
-        embedding = self.classifier.encode_batch(audio)
-        return embedding.squeeze(0).cpu()
+        embedding = self.classifier.get_embedding(audio_path)
+        return torch.from_numpy(embedding).unsqueeze(0)
 
     def calc_similarity(self, target_audio: str, reference_audios: list[str]) -> float:
         """話者認識モデルで音声の類似度を計算"""
