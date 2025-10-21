@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 import torchaudio
+import torch
 
 SAMPLING_RATE = 16000
 REPLACE_MAP: dict[str, str] = {
@@ -91,8 +92,12 @@ def get_prompt(text: str, code: list[int] | None = None, add_bos_token: bool = T
         prompt += "<|SPEECH_GENERATION_END|>"
     return prompt
 
-def preprocess_audio(audio_path: Path):
-    waveform, sample_rate = torchaudio.load(str(audio_path))
+def preprocess_audio(audio_path: Path | dict) -> torch.Tensor:
+    if isinstance(audio_path, Path):
+        waveform, sample_rate = torchaudio.load(str(audio_path))
+    else:
+        waveform, sample_rate = audio_path["array"], audio_path["sampling_rate"]
+        waveform = torch.tensor(waveform).unsqueeze(0)
     if sample_rate != SAMPLING_RATE:
         resampler = torchaudio.transforms.Resample(sample_rate, SAMPLING_RATE)
         waveform = resampler(waveform)

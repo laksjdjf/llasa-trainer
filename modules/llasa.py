@@ -27,14 +27,14 @@ class BaseAudioDecoder:
         print("✅ LLASA サーバークライアント 初期化完了！")
 
     @torch.no_grad()
-    def encode_audio(self, audio_path: str) -> list[int]:
-        waveform = preprocess_audio(Path(audio_path))
+    def encode_audio(self, audio_path: str | dict) -> list[int]:
+        waveform = preprocess_audio(Path(audio_path) if isinstance(audio_path, str) else audio_path)
         inputs = self.feature_extractor(
             audio=waveform,
             sampling_rate=self.feature_extractor.sampling_rate,
             return_tensors="pt",
             use_torch=True,
-        ).to(self.codec_model.device)
+        ).to(self.codec_model.device, dtype=next(self.codec_model.parameters()).dtype)
         vq_code = self.codec_model.encode(**inputs).audio_codes
         codes = vq_code[0, 0, :].cpu().numpy().tolist()
         return codes
@@ -77,7 +77,7 @@ class BaseAudioDecoder:
         
         text = reference_text + text if reference_text else text
         reference_codes = reference_codes or (self.encode_audio(reference_audio) if reference_audio else None)
-        prompt = get_prompt(text, reference_codes, add_bos_token=True, add_end_token=False)
+        prompt = get_prompt(text, reference_codes, add_bos_token=False, add_end_token=False)
         speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens)
         
         if not speech_ids or not decode_audio:
@@ -169,7 +169,7 @@ class LLASA(BaseAudioDecoder):
         cls,
         model_path: str = "./lora_checkpoints",
         codec_model_path: str = "Anime-XCodec2-hf",
-        dtype=torch.float16
+        dtype=torch.float16,
     ):
         """フォルダパスから LLASA モデルを読み込み"""
         
@@ -193,7 +193,17 @@ class LLASA(BaseAudioDecoder):
         tokenizer = AutoTokenizer.from_pretrained(model_path)
         
         print("🎵 XCodec2モデル読み込み中...")
-        codec_model = Xcodec2Model.from_pretrained(codec_model_path, device_map="auto").eval()
+        codec_model = Xcodec2Model.from_pretrained(codec_model_path, device_map="auto", dtype=dtype).eval()
+        # avoide half error
+        codec_model.decoder.head.to(dtype=torch.float32)
+        def hook_fn(self):
+            def forward(x):
+                x = self.backbone(x)
+                x = x.to(dtype=torch.float32)
+                x = self.head(x)[0]
+                return x
+            return forward
+        codec_model.decoder.forward = hook_fn(codec_model.decoder)
         feature_extractor = Xcodec2FeatureExtractor.from_pretrained(codec_model_path)
         
         return cls(model=model, tokenizer=tokenizer, codec_model=codec_model, feature_extractor=feature_extractor)
@@ -216,7 +226,6 @@ class LLASA(BaseAudioDecoder):
         
         # トークン化
         input_ids = self.tokenizer(prompt, return_tensors='pt').to(self.model.device)
-
         # 音声トークン生成
         outputs = self.model.generate(
             **input_ids,
@@ -227,7 +236,7 @@ class LLASA(BaseAudioDecoder):
             top_p=top_p,
             temperature=temperature,
             repetition_penalty=repeat_penalty,
-            use_cache=True,
+            use_cache=False,
         )
         
         # 音声IDを抽出

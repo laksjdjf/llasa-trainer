@@ -44,7 +44,7 @@ def main(config):
     # LLASAインスタンスを最初に作成（XCodec2も含む）
     print("🎯 LLASAインスタンスを作成中...")
     llasa = LLASA.from_pretrained(model_path=config.model_name, codec_model_path=config.get('codec_model_name', "Anime-XCodec2-hf"))
-
+    
     collator = DataCollatorForCompletionOnlyLM(
         "<|SPEECH_GENERATION_START|>",
         tokenizer=llasa.tokenizer,
@@ -66,6 +66,8 @@ def main(config):
 
     # データセットの読み込み
     train_dataset = load_dataset(config.data_dir)
+    def formatting_func(example):
+        return [example["text"][i] for i in range(len(example["text"]))]
 
     # トレーナー
     trainer = SFTTrainer(
@@ -74,7 +76,7 @@ def main(config):
         args=training_args,
         train_dataset=train_dataset,
         data_collator=collator,
-        dataset_text_field="text",
+        formatting_func=formatting_func,
         callbacks=callbacks,
         peft_config=lora_config,
     )

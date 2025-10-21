@@ -34,7 +34,18 @@ class LLASAServer(BaseAudioDecoder):
         print("🔄 XCodec2モデルを読み込み中...")
         
         # XCodec2の読み込み
-        codec_model = Xcodec2Model.from_pretrained(codec_model_path, device_map="auto").eval()
+        codec_model = Xcodec2Model.from_pretrained(codec_model_path, device_map="auto", dtype=dtype).eval()
+        
+        # avoide half error
+        codec_model.decoder.head.to(dtype=torch.float32)
+        def hook_fn(self):
+            def forward(x):
+                x = self.backbone(x)
+                x = x.to(dtype=torch.float32)
+                x = self.head(x)[0]
+                return x
+            return forward
+        codec_model.decoder.forward = hook_fn(codec_model.decoder)
         feature_extractor = Xcodec2FeatureExtractor.from_pretrained(codec_model_path)
         print("✅ XCodec2モデル読み込み完了")
         
@@ -94,13 +105,10 @@ class LLASAServer(BaseAudioDecoder):
         """
         
         # サーバーで生成
-        if prompt.startswith("<|begin_of_text|>"):
-            prompt = prompt[len("<|begin_of_text|>"):]
         generated_text, error = self._call_server(prompt, temperature, top_p, repeat_penalty, max_tokens, min_tokens)
         
         if error:
             raise RuntimeError(f"生成エラー: {error}")
-        
         speech_ids = extract_speech_ids(generated_text)
 
         if not generated_text:

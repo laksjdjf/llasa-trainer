@@ -23,7 +23,7 @@ class TTSTestCallback(TrainerCallback):
             self.test_text,
             temperature=0.7,
             top_p=0.9, 
-            max_tokens=1000,
+            max_tokens=300,
         )
         
         if audio_path:
@@ -52,7 +52,7 @@ def load_dataset(file_path: str):
     with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
             obj = json.loads(line)
-            samples.append(get_prompt(text=obj["text"], code=obj.get("code")))
+            samples.append(get_prompt(text=obj["text"], code=obj.get("code"), add_bos_token=False, add_end_token=True))
 
     # 2) HF Datasets へ
     random.shuffle(samples)
