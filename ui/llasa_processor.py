@@ -17,6 +17,7 @@ def generate(
     max_tokens: int = 300,
     reference_text: str = "",
     reference_audio: list[int] = None,
+    captions: dict = None,
 ) -> tuple[str, str]:
     """テキストから音声を生成"""
     global llasa
@@ -29,6 +30,7 @@ def generate(
         max_tokens,
         reference_text,
         reference_audio,
+        captions=captions,
     )
 
 def generate_multiple(
@@ -39,6 +41,7 @@ def generate_multiple(
     max_tokens: int = 300,
     reference_text: str = "",
     reference_audio: list[int] = None,
+    captions: dict = None,
 ) -> tuple[str, str]:
     """テキストから音声を生成（複数文対応）"""
     global llasa
@@ -51,6 +54,7 @@ def generate_multiple(
         max_tokens,
         reference_text,
         reference_audio,
+        captions=captions,
     )
 
 def transcribe(audio_path: str) -> str:

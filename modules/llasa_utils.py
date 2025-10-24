@@ -42,14 +42,14 @@ INVALID_PATTERN = re.compile(
     r"[^\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF\u3005"
     r"\u0041-\u005A\u0061-\u007A"
     r"\u0030-\u0039"
-    r"。、!?…♪♡○]"
+    r"。、!?…♪♡○（）]"
 )
 
 BOS_TOKEN = "<|begin_of_text|>"
+DEFAULT_SYSTEM_PROMPT = "Cutting Knowledge Date: December 2023\nToday Date: 02 Oct 2025"
 PROMPT_FORMAT = """<|start_header_id|>system<|end_header_id|>
 
-Cutting Knowledge Date: December 2023
-Today Date: 02 Oct 2025
+{system_prompt}
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
@@ -58,6 +58,17 @@ Convert the text to speech:<|TEXT_UNDERSTANDING_START|>{text}<|TEXT_UNDERSTANDIN
 <|SPEECH_GENERATION_START|>"""
 
 OUTPUT_FORMAT = "{speech}<|SPEECH_GENERATION_END|>"
+
+CAPTION_FORMAT = """emotion: {emotion}
+profile: {profile}
+mood: {mood}
+speed: {speed}
+prosody: {prosody}
+pitch_timbre: {pitch_timbre}
+style: {style}
+notes: {notes}
+caption: {caption}"""
+
 
 def normalize_text(text: str) -> str:
     for pattern, replacement in REPLACE_MAP.items():
@@ -80,10 +91,23 @@ def extract_speech_ids(speech_tokens_str):
     speech_ids = [int(match) for match in matches]
     return speech_ids
 
-def get_prompt(text: str, code: list[int] | None = None, add_bos_token: bool = True, add_end_token: bool = True) -> str:
+def get_prompt(text: str, code: list[int] | None = None, add_bos_token: bool = True, add_end_token: bool = True, captions: dict = None) -> str:
     text = normalize_text(text)
     prompt = BOS_TOKEN if add_bos_token else ""
-    prompt += PROMPT_FORMAT.format(text=text)
+    system_prompt = DEFAULT_SYSTEM_PROMPT
+    if captions:
+        system_prompt = CAPTION_FORMAT.format(
+            emotion=captions.get("emotion", "neutral"),
+            profile=captions.get("profile", "default"),
+            mood=captions.get("mood", "normal"),
+            speed=captions.get("speed", "normal"),
+            prosody=captions.get("prosody", "normal"),
+            pitch_timbre=captions.get("pitch_timbre", "normal"),
+            style=captions.get("style", "default"),
+            notes=captions.get("notes", ""),
+            caption=captions.get("caption", ""),
+        )
+    prompt += PROMPT_FORMAT.format(system_prompt=system_prompt, text=text)
 
     if code:
         speech_tokens = ids_to_speech_tokens(code)

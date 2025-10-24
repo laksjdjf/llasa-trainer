@@ -68,6 +68,7 @@ class BaseAudioDecoder:
         reference_audio: list[int] = None,
         reference_codes: list[int] = None,
         decode_audio: bool = True,
+        captions: dict = None,
     ) -> tuple[str, str]:
         """テキストから音声を生成（サーバー版）
         
@@ -77,7 +78,7 @@ class BaseAudioDecoder:
         
         text = reference_text + text if reference_text else text
         reference_codes = reference_codes or (self.encode_audio(reference_audio) if reference_audio else None)
-        prompt = get_prompt(text, reference_codes, add_bos_token=False, add_end_token=False)
+        prompt = get_prompt(text, reference_codes, add_bos_token=False, add_end_token=False, captions=captions)
         speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens)
         
         if not speech_ids or not decode_audio:
@@ -97,6 +98,7 @@ class BaseAudioDecoder:
         max_tokens: int = 300,
         reference_text: str = "",
         reference_audio: list[int] = None,
+        captions: dict = None,
     ) -> tuple[str, str]:
         """テキストから音声を生成（サーバー版・複数文対応）
         
@@ -107,7 +109,7 @@ class BaseAudioDecoder:
         speech_ids_list = []
         reference_codes = self.encode_audio(reference_audio) if reference_audio else None
         for i, text in enumerate(texts):
-            _, speech_ids = self.generate(text,temperature,top_p,repeat_penalty,max_tokens,reference_text,reference_audio=None,reference_codes=reference_codes,decode_audio=False)
+            _, speech_ids = self.generate(text,temperature,top_p,repeat_penalty,max_tokens,reference_text,reference_audio=None,reference_codes=reference_codes,decode_audio=False,captions=captions)
             if i < len(texts) - 1:
                 speech_ids = speech_ids[:-16]
             speech_ids_list.extend(speech_ids)

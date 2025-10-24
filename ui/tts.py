@@ -17,12 +17,36 @@ def generate_speech(
     temperature: float = 0.7,
     top_p: float = 0.9,
     repeat_penalty: float = 1.0,
-    max_tokens: int = 300
+    max_tokens: int = 300,
+    apply_caption: bool = False,
+    emotion: str = "",
+    profile: str = "",
+    mood: str = "",
+    speed: str = "",
+    prosody: str = "",
+    pitch_timbre: str = "",
+    style: str = "",
+    notes: str = "",
+    caption: str = ""
 ):
     
     """時間計測付き音声生成"""
     start_time = time.time()
-    audio_path, tokens = generate(text, temperature, top_p, repeat_penalty, max_tokens, reference_text, reference_audio)
+    if apply_caption:
+        captions = {
+            "emotion": emotion,
+            "profile": profile,
+            "mood": mood,
+            "speed": speed,
+            "prosody": prosody,
+            "pitch_timbre": pitch_timbre,
+            "style": style,
+            "notes": notes,
+            "caption": caption
+        }
+    else:
+        captions = None
+    audio_path, tokens = generate(text, temperature, top_p, repeat_penalty, max_tokens, reference_text, reference_audio, captions=captions)
     elapsed_time = time.time() - start_time
     
     # ステータスに時間情報を追加
@@ -41,12 +65,36 @@ def generate_multiple_speech(
     temperature: float = 0.7,
     top_p: float = 0.9,
     repeat_penalty: float = 1.0,
-    max_tokens: int = 300
+    max_tokens: int = 300,
+    apply_caption: bool = False,
+    emotion: str = "",
+    profile: str = "",
+    mood: str = "",
+    speed: str = "",
+    prosody: str = "",
+    pitch_timbre: str = "",
+    style: str = "",
+    notes: str = "",
+    caption: str = ""
 ):
     """時間計測付き複数文音声生成"""
     start_time = time.time()
+    if apply_caption:
+        captions = {
+            "emotion": emotion,
+            "profile": profile,
+            "mood": mood,
+            "speed": speed,
+            "prosody": prosody,
+            "pitch_timbre": pitch_timbre,
+            "style": style,
+            "notes": notes,
+            "caption": caption
+        }
+    else:
+        captions = None
     texts = [s.strip() for s in text.splitlines() if s.strip()]
-    audio_path, tokens = generate_multiple(texts, temperature, top_p, repeat_penalty, max_tokens, reference_text, reference_audio)
+    audio_path, tokens = generate_multiple(texts, temperature, top_p, repeat_penalty, max_tokens, reference_text, reference_audio, captions=captions)
     elapsed_time = time.time() - start_time
     
     # ステータスに時間情報を追加
@@ -92,6 +140,18 @@ def tts_interface():
                 with gr.Accordion("正規化済みテキストを確認", open=False):
                     normalized_text = gr.Textbox(label="✅正規化済みテキスト", interactive=False, lines=3)
                     reference_normalized_text = gr.Textbox(label="✅正規化済み参照テキスト", interactive=False, lines=3)
+
+                with gr.Accordion("キャプション設定 (詳細設定)", open=False):
+                    apply_caption = gr.Checkbox(label="キャプションを適用する", value=False)
+                    emotion = gr.Textbox(label="emotion")
+                    profile = gr.Textbox(label="profile")
+                    mood = gr.Textbox(label="mood")
+                    speed = gr.Textbox(label="speed")
+                    prosody = gr.Textbox(label="prosody")
+                    pitch_timbre = gr.Textbox(label="pitch_timbre")
+                    style = gr.Textbox(label="style")
+                    notes = gr.Textbox(label="notes")
+                    caption = gr.Textbox(label="caption")
                 
             with gr.Column():
                 audio_output = gr.Audio(label="🔊 生成された音声", type="filepath")
@@ -101,7 +161,7 @@ def tts_interface():
         generate_button.click(
             fn=generate_speech,
             inputs=[
-                text_input, reference_text, reference_audio, temperature, top_p, repeat_penalty, max_tokens
+                text_input, reference_text, reference_audio, temperature, top_p, repeat_penalty, max_tokens, apply_caption, emotion, profile, mood, speed, prosody, pitch_timbre, style, notes, caption
             ],
             outputs=[audio_output, status_output, tokens]
         )
@@ -109,7 +169,7 @@ def tts_interface():
         generate_multiple_button.click(
             fn=generate_multiple_speech,
             inputs=[
-                text_input, reference_text, reference_audio, temperature, top_p, repeat_penalty, max_tokens
+                text_input, reference_text, reference_audio, temperature, top_p, repeat_penalty, max_tokens, apply_caption, emotion, profile, mood, speed, prosody, pitch_timbre, style, notes, caption
             ],
             outputs=[audio_output, status_output, tokens]
         )
