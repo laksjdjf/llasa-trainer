@@ -10,6 +10,33 @@ SAMPLES = [
     "おつかれさまでした。"
 ]
 
+def build_captions_dict(
+    apply_caption: bool,
+    emotion: str,
+    profile: str,
+    mood: str,
+    speed: str,
+    prosody: str,
+    pitch_timbre: str,
+    style: str,
+    notes: str,
+    caption: str
+) -> dict | None:
+    """キャプション辞書を構築する共通ヘルパー関数"""
+    if apply_caption:
+        return {
+            "emotion": emotion,
+            "profile": profile,
+            "mood": mood,
+            "speed": speed,
+            "prosody": prosody,
+            "pitch_timbre": pitch_timbre,
+            "style": style,
+            "notes": notes,
+            "caption": caption
+        }
+    return None
+
 def generate_speech(
     text: str,
     reference_text: str,
@@ -32,20 +59,7 @@ def generate_speech(
     
     """時間計測付き音声生成"""
     start_time = time.time()
-    if apply_caption:
-        captions = {
-            "emotion": emotion,
-            "profile": profile,
-            "mood": mood,
-            "speed": speed,
-            "prosody": prosody,
-            "pitch_timbre": pitch_timbre,
-            "style": style,
-            "notes": notes,
-            "caption": caption
-        }
-    else:
-        captions = None
+    captions = build_captions_dict(apply_caption, emotion, profile, mood, speed, prosody, pitch_timbre, style, notes, caption)
     audio_path, tokens = generate(text, temperature, top_p, repeat_penalty, max_tokens, reference_text, reference_audio, captions=captions)
     elapsed_time = time.time() - start_time
     
@@ -79,20 +93,7 @@ def generate_multiple_speech(
 ):
     """時間計測付き複数文音声生成"""
     start_time = time.time()
-    if apply_caption:
-        captions = {
-            "emotion": emotion,
-            "profile": profile,
-            "mood": mood,
-            "speed": speed,
-            "prosody": prosody,
-            "pitch_timbre": pitch_timbre,
-            "style": style,
-            "notes": notes,
-            "caption": caption
-        }
-    else:
-        captions = None
+    captions = build_captions_dict(apply_caption, emotion, profile, mood, speed, prosody, pitch_timbre, style, notes, caption)
     texts = [s.strip() for s in text.splitlines() if s.strip()]
     audio_path, tokens = generate_multiple(texts, temperature, top_p, repeat_penalty, max_tokens, reference_text, reference_audio, captions=captions)
     elapsed_time = time.time() - start_time
