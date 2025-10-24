@@ -176,6 +176,181 @@ training:
 python main.py --config config/my_config.yaml
 ```
 
+### 4. VRAM節約方法
+
+学習時にVRAMが不足する場合、以下の方法でメモリ使用量を削減できます。
+
+#### 📊 VRAM使用量の目安
+
+| GPU | VRAM | 推奨設定 |
+|-----|------|---------|
+| RTX 3060 | 12GB | LoRA r=8, batch_size=1, gradient_accumulation=16 |
+| RTX 3090 / 4090 | 24GB | LoRA r=16, batch_size=1, gradient_accumulation=8 |
+| A100 | 40GB+ | LoRA r=32, batch_size=2, gradient_accumulation=4 |
+
+#### 🔧 主要な最適化パラメータ
+
+##### 1. **LoRAランクを下げる**
+
+LoRAランク（`r`）を小さくすると、学習可能なパラメータが減り、VRAM使用量が削減されます。
+
+```yaml
+lora:
+  r: 8              # 16から8に下げる（VRAM使用量 約30-40%削減）
+  lora_alpha: 16    # 通常はrの2倍に設定
+```
+
+**推奨値**:
+- VRAM 8-12GB: `r=8`
+- VRAM 12-16GB: `r=16`
+- VRAM 24GB以上: `r=32`
+
+##### 2. **バッチサイズと勾配蓄積の調整**
+
+バッチサイズを1に固定し、勾配蓄積ステップ（`gradient_accumulation_steps`）で実効バッチサイズを調整します。
+
+```yaml
+training:
+  per_device_train_batch_size: 1        # 常に1を推奨
+  gradient_accumulation_steps: 16       # VRAMが少ない場合は大きく設定
+```
+
+実効バッチサイズ = `per_device_train_batch_size × gradient_accumulation_steps`
+
+- VRAM不足時: `gradient_accumulation_steps`を16-32に増やす
+- 十分なVRAM時: `per_device_train_batch_size`を2に増やすことも可能
+
+##### 3. **混合精度学習の活用**
+
+メモリ使用量を約半分に削減できます。
+
+```yaml
+training:
+  fp16: true       # Ampere以前のGPU（RTX 20/30シリーズ）
+  bf16: false      # fp16使用時はfalseに
+```
+
+または
+
+```yaml
+training:
+  fp16: false      
+  bf16: true       # Ampere以降のGPU（RTX 40シリーズ、A100）推奨
+```
+
+**選択ガイド**:
+- RTX 20/30シリーズ、GTX 16シリーズ → `fp16: true`
+- RTX 40シリーズ、A100、H100 → `bf16: true`（より安定）
+
+##### 4. **勾配チェックポイント**
+
+計算時間が増えますが、VRAM使用量を大幅に削減できます。
+
+```yaml
+training:
+  gradient_checkpointing: true    # VRAM使用量 約20-30%削減
+```
+
+**トレードオフ**: 学習速度が約20-30%低下しますが、VRAM不足を解消できます。
+
+##### 5. **学習対象レイヤーの削減**
+
+LoRAを適用するレイヤーを減らすことでVRAM使用量を削減できます。
+
+```yaml
+lora:
+  target_modules:
+    - q_proj        # 最小構成: q_projとv_projのみ
+    - v_proj
+    # k_proj、o_projをコメントアウト
+```
+
+#### 💡 実践的な設定例
+
+##### 例1: VRAM 8-12GB（RTX 3060など）
+
+```yaml
+lora:
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - v_proj
+
+training:
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
+  fp16: true
+  bf16: false
+  gradient_checkpointing: true
+```
+
+##### 例2: VRAM 16-24GB（RTX 3090/4090など）
+
+```yaml
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+
+training:
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  fp16: false
+  bf16: true
+  gradient_checkpointing: false
+```
+
+##### 例3: VRAM 40GB以上（A100など）
+
+```yaml
+lora:
+  r: 32
+  lora_alpha: 64
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+
+training:
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  fp16: false
+  bf16: true
+  gradient_checkpointing: false
+```
+
+#### ⚠️ トラブルシューティング
+
+**"CUDA out of memory"エラーが発生する場合**:
+
+1. バッチサイズを1に固定: `per_device_train_batch_size: 1`
+2. LoRAランクを下げる: `r: 8`
+3. 勾配チェックポイントを有効化: `gradient_checkpointing: true`
+4. 学習対象レイヤーを削減: `target_modules`を`q_proj`と`v_proj`のみに
+5. それでも不足する場合: FFT（Full Fine-tuning）ではなく必ずLoRAを使用
+
+**学習が遅すぎる場合**:
+
+1. 勾配チェックポイントを無効化: `gradient_checkpointing: false`
+2. `gradient_accumulation_steps`を減らす（VRAMが許す範囲で）
+3. 混合精度学習を有効化: `fp16: true`または`bf16: true`
+
+#### 📈 その他のヒント
+
+- **不要なプロセスを終了**: 学習前にブラウザやその他のGPUを使用するアプリケーションを終了
+- **システムモニタリング**: `nvidia-smi`コマンドでVRAM使用状況を確認
+- **段階的な調整**: 設定を変更する際は一度に一つずつ変更し、効果を確認
+- **データセット長の考慮**: 音声が長いほどVRAMを多く使用するため、極端に長い音声は分割を検討
+
 ## 🎤 音声生成（推論）
 
 ### Gradio UIの起動
