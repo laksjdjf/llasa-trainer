@@ -5,6 +5,22 @@
 LLASA-3B（Large Language Audio Speech Analysis）は、テキストから音声を生成する日本語TTSモデルです。このリポジトリは、独自のデータセットでLLASA-3BをファインチューニングするためのトレーニングツールとUIを提供します。
 **注意**: `requirements.txt`には特定のバージョンのtransformersライブラリが含まれています。
 
+## 🎭 新機能: Mask Diffusion
+
+このリポジトリはマスク拡散（Mask Diffusion）による学習とサンプリングをサポートしています。
+
+### Mask Diffusionとは？
+
+従来の自己回帰的（Causal LM）な学習ではなく、BERTのようなマスク予測アプローチを使用します：
+- **学習時**: 音声トークンの一部をランダムにマスクし、マスクされたトークンを予測するように学習
+- **推論時**: 全ての音声トークンを最初にマスクし、反復的に修復していくことで音声を生成
+
+### 利点
+
+- 非自己回帰的な生成が可能
+- 音声の一部を修復（インペインティング）できる
+- より柔軟な音声編集が可能
+
 ## 🔄 Transformers対応XCodec2モデルの作成
 
 このプロジェクトはHugging Face Transformers対応のXCodec2モデルを使用します。オリジナルのAnime-XCodec2チェックポイントをTransformers形式に変換する場合は、以下の手順に従ってください。
@@ -138,7 +154,9 @@ python create_dataset.py ./audio ./text.txt -o dataset/data.jsonl --ext .mp3
 
 ## 🎓 トレーニング
 
-### 1. 設定ファイルの準備
+### 通常のトレーニング（Causal LM）
+
+#### 1. 設定ファイルの準備
 
 `config/example.yaml`をコピーして編集します：
 
@@ -146,7 +164,7 @@ python create_dataset.py ./audio ./text.txt -o dataset/data.jsonl --ext .mp3
 cp config/example.yaml config/my_config.yaml
 ```
 
-### 2. 主要な設定パラメータ
+#### 2. 主要な設定パラメータ
 
 ```yaml
 # データパス
@@ -174,6 +192,48 @@ training:
 
 ```bash
 python main.py --config config/my_config.yaml
+```
+
+### Mask Diffusionトレーニング
+
+#### 1. 設定ファイルの準備
+
+Mask Diffusion専用の設定ファイルを使用します：
+
+```bash
+cp config/mask_diffusion_example.yaml config/my_mask_diffusion.yaml
+```
+
+#### 2. Mask Diffusion固有の設定
+
+```yaml
+# Mask Diffusion設定
+mask_diffusion:
+  mask_ratio: 0.15  # マスクする音声トークンの割合（0.10-0.30推奨）
+```
+
+#### 3. トレーニング開始
+
+```bash
+python main_mask_diffusion.py --config config/my_mask_diffusion.yaml
+```
+
+#### 4. デモスクリプト
+
+Mask Diffusionの動作を確認するためのデモスクリプトも用意されています：
+
+```bash
+# すべてのデモを実行
+python demo_mask_diffusion.py --mode all
+
+# 生成デモのみ
+python demo_mask_diffusion.py --mode generation
+
+# インペインティングデモのみ
+python demo_mask_diffusion.py --mode inpainting
+
+# データコレーターのデモのみ
+python demo_mask_diffusion.py --mode collator
 ```
 
 ## 🎤 音声生成（推論）
@@ -212,11 +272,16 @@ python app.py -m [モデルパス] -c [コーデックモデルパス]
 
 | スクリプト | 説明 |
 |----------|------|
-| `main.py` | トレーニングのメインスクリプト |
+| `main.py` | トレーニングのメインスクリプト（Causal LM） |
+| `main_mask_diffusion.py` | Mask Diffusionトレーニングのメインスクリプト |
+| `demo_mask_diffusion.py` | Mask Diffusion機能のデモスクリプト |
 | `create_dataset.py` | データセット作成ツール |
 | `app.py` | Gradio WebUIの起動 |
 | `modules/llasa.py` | LLASAモデルクラス |
+| `modules/llasa_mask_diffusion.py` | Mask Diffusion対応LLASAクラス |
 | `modules/train.py` | トレーニングロジック |
+| `modules/mask_diffusion_train.py` | Mask Diffusion学習モジュール |
+| `modules/mask_diffusion_sampling.py` | Mask Diffusionサンプリングモジュール |
 | `modules/llasa_utils.py` | ユーティリティ関数 |
 
 
@@ -225,23 +290,29 @@ python app.py -m [モデルパス] -c [コーデックモデルパス]
 ```
 llasa-trainer/
 ├── config/
-│   └── example.yaml          # 設定ファイル例
+│   ├── example.yaml                    # 通常トレーニング設定例
+│   └── mask_diffusion_example.yaml     # Mask Diffusion設定例
 ├── modules/
-│   ├── llasa.py              # LLASAモデルクラス
-│   ├── llasa_utils.py        # ユーティリティ
-│   ├── train.py              # トレーニングロジック
-│   └── train_utils.py        # トレーニングユーティリティ
+│   ├── llasa.py                        # LLASAモデルクラス
+│   ├── llasa_mask_diffusion.py         # Mask Diffusion対応LLASAクラス
+│   ├── llasa_utils.py                  # ユーティリティ
+│   ├── train.py                        # トレーニングロジック
+│   ├── train_utils.py                  # トレーニングユーティリティ
+│   ├── mask_diffusion_train.py         # Mask Diffusion学習モジュール
+│   └── mask_diffusion_sampling.py      # Mask Diffusionサンプリングモジュール
 ├── ui/
-│   ├── llasa_processor.py    # LLASAモデル処理
-│   ├── tts.py                # TTSインターフェース
-│   ├── tokenizer.py          # トークナイザーインターフェース
-│   └── similarity.py         # 類似度計算インターフェース
+│   ├── llasa_processor.py              # LLASAモデル処理
+│   ├── tts.py                          # TTSインターフェース
+│   ├── tokenizer.py                    # トークナイザーインターフェース
+│   └── similarity.py                   # 類似度計算インターフェース
 ├── script/
-│   └── convert_weight_norm_key.py  # XCodec2変換スクリプト
-├── app.py                    # Gradio UI
-├── create_dataset.py         # データセット作成
-├── main.py                   # トレーニングメイン
-└── requirements.txt          # 依存関係
+│   └── convert_weight_norm_key.py      # XCodec2変換スクリプト
+├── app.py                              # Gradio UI
+├── create_dataset.py                   # データセット作成
+├── main.py                             # トレーニングメイン（Causal LM）
+├── main_mask_diffusion.py              # Mask Diffusionトレーニングメイン
+├── demo_mask_diffusion.py              # Mask Diffusion機能デモ
+└── requirements.txt                    # 依存関係
 ```
 
 ## 📜 ライセンスと謝辞
