@@ -36,7 +36,7 @@ Mask diffusion is an alternative training and inference approach for the LLASA T
 **Key Parameters:**
 - `mask_ratio`: Proportion of audio tokens to mask (default: 0.15, recommended: 0.10-0.30)
 - `speech_start_id`: Start ID for speech tokens (128264)
-- `speech_end_id`: End ID for speech tokens (128261)
+- `speech_end_id`: Token ID for the speech end marker `<|SPEECH_GENERATION_END|>` (128261)
 
 ### 2. Sampling Module (`modules/mask_diffusion_sampling.py`)
 
@@ -215,9 +215,9 @@ inpainted_codes = llasa_md.inpaint_audio(
 ## Technical Notes
 
 ### Speech Token Range
-- Speech tokens: `[128264, 128264 + 65536)` (65536 possible codes)
+- Speech tokens: `[128264, 193800)` (i.e., 128264 to 128264+65536, representing 65536 possible codes)
 - Speech start marker: `<|s_0|>` through `<|s_65535|>`
-- Speech end marker: `<|SPEECH_GENERATION_END|>` (ID: 128261)
+- Speech end marker: `<|SPEECH_GENERATION_END|>` (ID: 128261, used to mark end of generation)
 
 ### Mask Token
 - Uses `[MASK]` special token
