@@ -2,7 +2,6 @@ from transformers import LlamaForCausalLM, AutoTokenizer, Xcodec2Model, Xcodec2F
 import torch
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
-import torch
 from torch.nn.utils.rnn import pad_sequence
 from modules.llasa import LLASA
 from peft import AutoPeftModelForCausalLM, LoraConfig
@@ -17,6 +16,9 @@ class LlasaForMaskedLM(LlamaForCausalLM):
 
     @torch.no_grad()
     def generate(self, input_ids, max_new_tokens=300, step=20, temperature=1.0, top_p=0.9, **kwargs):
+        if step <= 0:
+            raise ValueError(f"step must be positive, got {step}")
+        
         batch_size = input_ids.size(0)
         len_inputs = input_ids.size(1)
         device = input_ids.device
@@ -82,6 +84,8 @@ class DataCollatorGenMask:
         gen_spans: List[slice] = []
         for ids in input_ids_list:
             sep_pos = (ids == self.sep_token_id).nonzero(as_tuple=False)
+            if sep_pos.numel() == 0:
+                raise ValueError(f"sep_token_id {self.sep_token_id} not found in input_ids")
             start = int(sep_pos[0].item()) + 1
             gen_spans.append(slice(start, len(ids)))
 
@@ -140,8 +144,8 @@ class LlasaDiffusion(LLASA):
                 dtype=dtype,
                 device_map="auto"
             )
-        except:
-            print("⚠️ 通常モデルとして再試行中...")
+        except Exception as e:
+            print(f"⚠️ 通常モデルとして再試行中... (Error: {e})")
             model = LlasaForMaskedLM.from_pretrained(
                 model_path,
                 dtype=dtype,
@@ -153,7 +157,7 @@ class LlasaDiffusion(LLASA):
         
         print("🎵 XCodec2モデル読み込み中...")
         codec_model = Xcodec2Model.from_pretrained(codec_model_path, device_map="auto", dtype=dtype).eval()
-        # avoide half error
+        # avoid half precision error
         codec_model.decoder.head.to(dtype=torch.float32)
         def hook_fn(self):
             def forward(x):
