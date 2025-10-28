@@ -36,7 +36,7 @@ class LLASAServer(BaseAudioDecoder):
         # XCodec2の読み込み
         codec_model = Xcodec2Model.from_pretrained(codec_model_path, device_map="auto", dtype=dtype).eval()
         
-        # avoide half error
+        # avoid half precision error
         codec_model.decoder.head.to(dtype=torch.float32)
         def hook_fn(self):
             def forward(x):
