@@ -6,6 +6,7 @@ from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 # LLASAクラスをインポート
 from modules.llasa import LLASA
 from modules.train_utils import TTSTestCallback, load_dataset
+import torch
 
 def main(config):
     """メイン関数"""
@@ -43,7 +44,8 @@ def main(config):
     
     # LLASAインスタンスを最初に作成（XCodec2も含む）
     print("🎯 LLASAインスタンスを作成中...")
-    llasa = LLASA.from_pretrained(model_path=config.model_name, codec_model_path=config.get('codec_model_name', "Anime-XCodec2-hf"))
+    dtype = getattr(torch, config.get('dtype', 'float16'))
+    llasa = LLASA.from_pretrained(model_path=config.model_name, codec_model_path=config.get('codec_model_name', "Anime-XCodec2-hf"), dtype=dtype)
     
     collator = DataCollatorForCompletionOnlyLM(
         "<|SPEECH_GENERATION_START|>",

@@ -5,9 +5,9 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, Xcodec2Model, Xcod
 from peft import AutoPeftModelForCausalLM
 from modules.llasa_utils import get_prompt, preprocess_audio, SAMPLING_RATE
 from pathlib import Path
+from abc import ABC, abstractmethod
 
-
-class BaseAudioDecoder:
+class BaseAudioDecoder(ABC):
     """XCodec2デコード機能の共通基底クラス"""
     
     def __init__(
@@ -69,6 +69,7 @@ class BaseAudioDecoder:
         reference_codes: list[int] = None,
         decode_audio: bool = True,
         captions: dict = None,
+        step: int = 20,
     ) -> tuple[str, str]:
         """テキストから音声を生成（サーバー版）
         
@@ -79,7 +80,7 @@ class BaseAudioDecoder:
         text = reference_text + text if reference_text else text
         reference_codes = reference_codes or (self.encode_audio(reference_audio) if reference_audio else None)
         prompt = get_prompt(text, reference_codes, add_bos_token=False, add_end_token=False, captions=captions)
-        speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens)
+        speech_ids = self.generate_tokens(prompt, temperature, top_p, repeat_penalty, max_tokens, 0, step)
         
         if not speech_ids or not decode_audio:
             return None, speech_ids
@@ -163,6 +164,32 @@ class BaseAudioDecoder:
         ref_embs = [self.get_embedding(ref) for ref in reference_audios]
         similarities = [torch.cosine_similarity(target_emb, ref_emb, dim=1).item() for ref_emb in ref_embs]
         return similarities
+    
+    @abstractmethod
+    def generate_tokens(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        repeat_penalty: float = 1.1,
+        max_tokens: int = 300,
+        min_tokens: int = 0,
+        step: int = 20,
+    ) -> list[int]:
+        """テキストから音声トークンを生成"""
+        pass
+    
+    @classmethod
+    @abstractmethod
+    def from_pretrained(
+        cls,
+        model_path: str = "./lora_checkpoints",
+        codec_model_path: str = "Anime-XCodec2-hf",
+        dtype=torch.float16,
+    ):
+        """フォルダパスから LLASA モデルを読み込み"""
+        pass
+
 
 class LLASA(BaseAudioDecoder):
 
@@ -219,6 +246,7 @@ class LLASA(BaseAudioDecoder):
         repeat_penalty: float = 1.1,
         max_tokens: int = 300,
         min_tokens: int = 0,
+        step: int = 20,
     ) -> list[int]:
         """テキストから音声トークンを生成
         
@@ -239,6 +267,7 @@ class LLASA(BaseAudioDecoder):
             temperature=temperature,
             repetition_penalty=repeat_penalty,
             use_cache=False,
+            step=step,
         )
         
         # 音声IDを抽出

@@ -97,6 +97,7 @@ class LLASAServer(BaseAudioDecoder):
         repeat_penalty: float = 1.1,
         max_tokens: int = 300,
         min_tokens: int = 0,
+        step: int = 20,
     ) -> list[int]:
         """テキストから音声トークンを生成（サーバー版）
         
