@@ -2,7 +2,6 @@ from transformers import LlamaForCausalLM, AutoTokenizer, Xcodec2Model, Xcodec2F
 import torch
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
-import torch
 from torch.nn.utils.rnn import pad_sequence
 from modules.llasa import LLASA
 from peft import AutoPeftModelForCausalLM, LoraConfig
@@ -11,12 +10,38 @@ import os
 from trl import SFTTrainer
 
 class LlasaForMaskedLM(LlamaForCausalLM):
+    """
+    LLASA model for masked language modeling with diffusion-based generation.
+    
+    This model extends LlamaForCausalLM to support diffusion-based text generation
+    using masked token prediction.
+    """
     def __init__(self, config):
         super().__init__(config)
-        self.mask_token_id = 128002
+        self.mask_token_id = 128002  # Special token ID for masking
 
     @torch.no_grad()
     def generate(self, input_ids, max_new_tokens=300, step=20, temperature=1.0, top_p=0.9, **kwargs):
+        """
+        Generate tokens using diffusion-based masked prediction.
+        
+        Args:
+            input_ids: Input token IDs [batch_size, seq_len]
+            max_new_tokens: Maximum number of new tokens to generate
+            step: Number of diffusion steps
+            temperature: Sampling temperature
+            top_p: Nucleus sampling parameter (currently unused)
+            **kwargs: Additional keyword arguments
+            
+        Returns:
+            Generated token IDs [batch_size, seq_len + max_new_tokens]
+            
+        Raises:
+            ValueError: If step <= 0
+        """
+        if step <= 0:
+            raise ValueError(f"step must be positive, got {step}")
+        
         batch_size = input_ids.size(0)
         len_inputs = input_ids.size(1)
         device = input_ids.device
@@ -63,6 +88,19 @@ class LlasaForMaskedLM(LlamaForCausalLM):
 
 @dataclass
 class DataCollatorGenMask:
+    """
+    Data collator for masked language modeling with generation.
+    
+    This collator masks tokens in the generation portion of the input
+    for training diffusion-based models.
+    
+    Attributes:
+        sep_token_id: Token ID that separates prompt from generation
+        mask_token_id: Token ID used for masking
+        pad_token_id: Token ID used for padding
+        p_range: Range of masking probabilities (min, max)
+        num_heads: Number of attention heads for attention mask
+    """
     sep_token_id: int
     mask_token_id: int
     pad_token_id: int
@@ -70,6 +108,18 @@ class DataCollatorGenMask:
     num_heads: int = 16
 
     def __call__(self, features: List[Dict]) -> Dict[str, torch.Tensor]:
+        """
+        Process a batch of features and apply masking.
+        
+        Args:
+            features: List of feature dictionaries with 'input_ids' key
+            
+        Returns:
+            Dictionary with 'input_ids', 'labels', and 'attention_mask'
+            
+        Raises:
+            ValueError: If sep_token_id is not found in input_ids
+        """
         # ---- 1) 取り出しと張り合わせ（可変長 -> パディングは後でまとめて） ----
         input_ids_list: List[torch.Tensor] = []
 
@@ -82,6 +132,8 @@ class DataCollatorGenMask:
         gen_spans: List[slice] = []
         for ids in input_ids_list:
             sep_pos = (ids == self.sep_token_id).nonzero(as_tuple=False)
+            if sep_pos.numel() == 0:
+                raise ValueError(f"sep_token_id {self.sep_token_id} not found in input_ids")
             start = int(sep_pos[0].item()) + 1
             gen_spans.append(slice(start, len(ids)))
 
@@ -115,7 +167,9 @@ class DataCollatorGenMask:
         input_ids = pad_sequence(masked_inputs, batch_first=True, padding_value=self.pad_token_id)
         labels = pad_sequence(labels_list, batch_first=True, padding_value=-100)
         attention_mask = torch.ones(
-            (input_ids.size(0), self.num_heads, input_ids.size(1), input_ids.size(1)), dtype=torch.bool
+            (input_ids.size(0), self.num_heads, input_ids.size(1), input_ids.size(1)),
+            device=input_ids.device,
+            dtype=torch.bool
         )
 
         batch = {"input_ids": input_ids, "labels": labels, "attention_mask": attention_mask}
@@ -123,6 +177,12 @@ class DataCollatorGenMask:
         return batch
 
 class LlasaDiffusion(LLASA):
+    """
+    LLASA model with diffusion-based generation capabilities.
+    
+    This class extends the base LLASA model to support diffusion-based
+    masked token prediction for speech generation.
+    """
     @classmethod
     def from_pretrained(
         cls,
@@ -130,7 +190,17 @@ class LlasaDiffusion(LLASA):
         codec_model_path: str = "Anime-XCodec2-hf",
         dtype=torch.float16,
     ):
-        """フォルダパスから LLASA モデルを読み込み"""
+        """
+        Load LLASA diffusion model from pretrained checkpoint.
+        
+        Args:
+            model_path: Path to the model checkpoint
+            codec_model_path: Path to the XCodec2 model
+            dtype: Data type for model parameters
+            
+        Returns:
+            Loaded LlasaDiffusion instance
+        """
         
         # モデル読み込み
         print("📦 LoRAモデル読み込み中...")
@@ -140,8 +210,8 @@ class LlasaDiffusion(LLASA):
                 dtype=dtype,
                 device_map="auto"
             )
-        except:
-            print("⚠️ 通常モデルとして再試行中...")
+        except Exception as e:
+            print(f"⚠️ 通常モデルとして再試行中... (Error: {e})")
             model = LlasaForMaskedLM.from_pretrained(
                 model_path,
                 dtype=dtype,
@@ -153,7 +223,7 @@ class LlasaDiffusion(LLASA):
         
         print("🎵 XCodec2モデル読み込み中...")
         codec_model = Xcodec2Model.from_pretrained(codec_model_path, device_map="auto", dtype=dtype).eval()
-        # avoide half error
+        # avoid half precision error
         codec_model.decoder.head.to(dtype=torch.float32)
         def hook_fn(self):
             def forward(x):
@@ -168,7 +238,12 @@ class LlasaDiffusion(LLASA):
         return cls(model=model, tokenizer=tokenizer, codec_model=codec_model, feature_extractor=feature_extractor)
     
 def main(config):
-    """メイン関数"""
+    """
+    Main training function for LLASA diffusion model.
+    
+    Args:
+        config: Configuration object containing training parameters
+    """
     
     # CUDA設定
     os.environ["CUDA_VISIBLE_DEVICES"] = config.cuda_visible_devices
@@ -204,10 +279,17 @@ def main(config):
     # LLASAインスタンスを最初に作成（XCodec2も含む）
     print("🎯 LLASAインスタンスを作成中...")
     dtype = getattr(torch, config.get('dtype', 'float16'))
-    llasa = LlasaDiffusion.from_pretrained(model_path=config.model_name, codec_model_path=config.get('codec_model_name', "Anime-XCodec2-hf"), dtype=dtype)
+    llasa = LlasaDiffusion.from_pretrained(
+        model_path=config.model_name,
+        codec_model_path=config.get('codec_model_name', "Anime-XCodec2-hf"),
+        dtype=dtype
+    )
+    
+    # Token IDs for data collator
+    SPEECH_GENERATION_START_TOKEN_ID = 128260  # <|SPEECH_GENERATION_START|>
     
     collator = DataCollatorGenMask(
-        128260, #<|SPEECH_GENERATION_START|>
+        SPEECH_GENERATION_START_TOKEN_ID,
         llasa.model.mask_token_id,
         llasa.tokenizer.pad_token_id,
         num_heads=llasa.model.config.num_attention_heads,

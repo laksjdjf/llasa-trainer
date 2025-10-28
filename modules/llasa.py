@@ -210,8 +210,8 @@ class LLASA(BaseAudioDecoder):
                 dtype=dtype,
                 device_map="auto"
             )
-        except:
-            print("⚠️ 通常モデルとして再試行中...")
+        except Exception as e:
+            print(f"⚠️ 通常モデルとして再試行中... (Error: {e})")
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 dtype=dtype,
@@ -223,7 +223,7 @@ class LLASA(BaseAudioDecoder):
         
         print("🎵 XCodec2モデル読み込み中...")
         codec_model = Xcodec2Model.from_pretrained(codec_model_path, device_map="auto", dtype=dtype).eval()
-        # avoide half error
+        # avoid half precision error
         codec_model.decoder.head.to(dtype=torch.float32)
         def hook_fn(self):
             def forward(x):
